@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matematični tutor</title>
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      processEscapes: true
+    },
+    svg: { fontCache: 'global' },
+    startup: { typeset: false }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh; display: flex; justify-content: center;
+    align-items: flex-start; padding: 20px;
+  }
+  .card {
+    background: white; border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 40px; width: 100%; max-width: 1000px; margin: 20px 0;
+  }
+  h1 { color: #333; margin-bottom: 10px; font-size: 26px; }
+  h2 { color: #555; margin-bottom: 20px; font-size: 20px; }
+  h3 { color: #555; font-size: 17px; margin-bottom: 12px; }
+  .subtitle { color: #777; margin-bottom: 25px; font-size: 14px; }
+  input, button, select, textarea { font-family: inherit; font-size: 15px; }
+  input, select, textarea {
+    width: 100%; padding: 12px 15px; border: 2px solid #ddd;
+    border-radius: 10px; margin-bottom: 12px; background: white;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
+  button {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white; border: none; padding: 12px 24px;
+    border-radius: 10px; cursor: pointer; font-weight: 600;
+    transition: transform 0.15s, box-shadow 0.15s; width: 100%;
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,0.4); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  button.secondary { background: #f0f0f5; color: #555; width: auto; padding: 8px 16px; font-size: 14px; }
+  button.secondary:hover { background: #e0e0ea; box-shadow: none; transform: none; }
+  button.danger { background: #e74c3c; width: auto; padding: 6px 12px; font-size: 12px; }
+  button.success { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+  button.small { padding: 6px 12px; font-size: 13px; width: auto; }
+  .error { color: #e74c3c; font-size: 14px; margin-bottom: 12px; min-height: 18px; }
+  .hidden { display: none !important; }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 25px; padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f5; gap: 10px; flex-wrap: wrap;
+  }
+  .header h2 { margin: 0; }
+  .user-info { font-size: 14px; color: #777; }
+  .chapter {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; background: #f8f9fc; border-radius: 12px;
+    margin-bottom: 10px; cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    border-left: 4px solid #667eea;
+  }
+  .chapter.locked { opacity: 0.6; cursor: not-allowed; border-left-color: #e74c3c; }
+  .chapter.utrjevanje { border-left-color: #27ae60; }
+  .chapter:hover { background: #eef0fa; transform: translateX(4px); }
+  .chapter.locked:hover { transform: none; background: #f8f9fc; }
+  .chapter-title { font-weight: 600; color: #333; }
+  .chapter-desc { font-size: 13px; color: #888; margin-top: 3px; }
+  .chapter-deadline { font-size: 12px; color: #e67e22; margin-top: 4px; }
+  .badge {
+    display: inline-block; color: white; font-size: 11px;
+    padding: 2px 8px; border-radius: 8px; margin-left: 6px;
+    vertical-align: middle; font-weight: 600;
+  }
+  .badge-grade { background: #f39c12; }
+  .badge-cat-domaca { background: #3498db; }
+  .badge-cat-utrjevanje { background: #27ae60; }
+  .big-btn-row { display: flex; gap: 14px; margin: 20px 0; flex-wrap: wrap; }
+  .big-btn {
+    flex: 1; min-width: 220px; padding: 28px 24px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white; border: none; border-radius: 16px;
+    cursor: pointer; font-weight: 700; font-size: 20px;
+    transition: transform 0.15s, box-shadow 0.15s; text-align: center;
+  }
+  .big-btn.domaca { background: linear-gradient(135deg, #3498db, #2980b9); }
+  .big-btn.utrjevanje { background: linear-gradient(135deg, #27ae60, #16a085); }
+  .big-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.25); }
+  .big-btn .sub { font-size: 13px; opacity: 0.9; font-weight: 500; margin-top: 6px; display: block; }
+  .task-box { background: #f8f9fc; border-radius: 12px; padding: 22px; margin: 20px 0; }
+  .task-text {
+    font-size: 26px; font-weight: 600; color: #333; margin-bottom: 20px;
+    line-height: 1.6; text-align: center; min-height: 40px;
+  }
+  .task-text .mjx-container { font-size: 140% !important; }
+  .feedback { margin-top: 12px; font-size: 15px; line-height: 1.6; min-height: 22px; }
+  .feedback.correct { color: #27ae60; font-weight: 600; }
+  .feedback.wrong { color: #e74c3c; font-weight: 600; }
+  .explanation {
+    background: #fff7e6; border-left: 4px solid #f39c12;
+    border-radius: 8px; padding: 16px; margin-top: 14px;
+    font-size: 14px; line-height: 1.8; color: #555;
+  }
+  .explanation ol { margin-left: 22px; margin-top: 8px; }
+  .explanation li { margin-bottom: 8px; }
+  .explanation .correct-answer {
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed #f39c12;
+    font-weight: 700; color: #d35400; font-size: 15px;
+  }
+  .row { display: flex; gap: 10px; }
+  .row input { margin-bottom: 0; }
+  .progress {
+    font-size: 13px; color: #888; margin-bottom: 10px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  .btn-row { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+  .btn-row button { width: auto; flex: 1; min-width: 120px; }
+  .logout { background: #e74c3c; width: auto; padding: 8px 16px; font-size: 14px; }
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .stat-card { background: linear-gradient(135deg, #f8f9fc, #eef0fa); border-radius: 12px; padding: 16px; text-align: center; }
+  .stat-card .num { font-size: 24px; font-weight: 700; color: #667eea; }
+  .stat-card .lbl { font-size: 12px; color: #777; margin-top: 4px; }
+  .bar-container { background: #f0f0f5; border-radius: 8px; height: 10px; overflow: hidden; margin-top: 6px; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #eee; }
+  th { background: #f8f9fc; color: #555; font-weight: 600; font-size: 13px; }
+  td { color: #444; }
+  .pct { font-weight: 700; }
+  .pct.good { color: #27ae60; }
+  .pct.mid { color: #f39c12; }
+  .pct.bad { color: #e74c3c; }
+  .detail-box { background: #f8f9fc; border-radius: 10px; padding: 16px; margin-top: 12px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    width: auto; padding: 9px 16px; font-size: 14px;
+    background: #f0f0f5; color: #666; border-radius: 10px;
+    cursor: pointer; font-weight: 600; border: none;
+  }
+  .tab.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+  .empty-note { color: #999; font-size: 14px; padding: 16px; text-align: center; }
+  .type-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #555; }
+  .type-row .type-pct { font-weight: 700; }
+  .error-item {
+    background: #fff5f5; border-left: 3px solid #e74c3c;
+    padding: 8px 12px; margin-bottom: 6px; font-size: 13px; border-radius: 6px;
+  }
+  .analysis-text {
+    background: #f0f7ff; border-left: 4px solid #3498db;
+    padding: 14px 16px; margin: 12px 0; border-radius: 8px;
+    font-size: 14px; line-height: 1.7; color: #2c3e50;
+  }
+  .loading { color: #667eea; font-size: 14px; font-style: italic; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid #ddd; border-top-color: #667eea;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .resume-banner {
+    background: #e8f5e9; border-left: 4px solid #27ae60;
+    padding: 12px 16px; margin-bottom: 16px; border-radius: 8px;
+    font-size: 14px; color: #2e7d32;
+  }
+  .settings-box { background: #fff8e1; border-left: 4px solid #f39c12; padding: 18px; border-radius: 10px; margin-bottom: 16px; }
+  .history-item {
+    display: flex; justify-content: space-between; gap: 10px;
+    font-size: 12px; padding: 6px 0; border-bottom: 1px solid #eee;
+  }
+  .history-item.ok { color: #27ae60; }
+  .history-item.fail { color: #e74c3c; }
+  .history-q { flex: 1; }
+  .badge-ok { background: #27ae60; color: white; padding: 1px 6px; border-radius: 6px; font-size: 11px; }
+  .badge-fail { background: #e74c3c; color: white; padding: 1px 6px; border-radius: 6px; font-size: 11px; }
+  .grade-group {
+    background: #f8f9fc; border-radius: 12px;
+    margin-bottom: 12px; border-left: 4px solid #667eea;
+    overflow: hidden;
+  }
+  .grade-group summary {
+    padding: 14px 18px; cursor: pointer;
+    font-weight: 700; color: #333; font-size: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    user-select: none; outline: none; list-style: none;
+  }
+  .grade-group summary::-webkit-details-marker { display: none; }
+  .grade-group summary::after {
+    content: '▾'; font-size: 14px; color: #667eea;
+    transition: transform 0.2s;
+  }
+  .grade-group[open] summary::after { transform: rotate(180deg); }
+  .grade-group summary:hover { background: #eef0fa; }
+  .grade-group .grade-body { padding: 4px 12px 12px 12px; }
+  .chapter-actions { display: flex; gap: 6px; align-items: center; }
+  .chapter-actions button {
+    width: auto; padding: 6px 10px; font-size: 13px;
+    background: #f0f0f5; color: #555; border-radius: 8px;
+    font-weight: 600; border: none; cursor: pointer;
+  }
+  .chapter-actions button:hover { background: #e0e0ea; transform: none; box-shadow: none; }
+  .chapter-actions button.del { background: #fdecea; color: #c0392b; }
+  .chapter-actions button.del:hover { background: #f9d6d1; }
+  /* Modal za urejanje učenca */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px;
+  }
+  .modal-box {
+    background: white; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .modal-box h3 { margin-bottom: 16px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .modal-actions button { flex: 1; }
+</style>
+</head>
+<body>
+<div class="card" id="app">
+
+  <!-- PRIJAVA -->
+  <div id="loginView">
+    <h1>📐 Matematični tutor</h1>
+    <p class="subtitle">Prijavi se s svojim uporabniškim imenom in geslom.</p>
+    <input id="loginUser" placeholder="Uporabniško ime" autocomplete="username">
+    <input id="loginPass" type="password" placeholder="Geslo" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter') login()">
+    <div class="error" id="loginError"></div>
+    <button onclick="login()">Prijava</button>
+    <p style="margin-top:18px; font-size:13px; color:#aaa;">
+      Učitelj: <b>ucitelj</b> / <b>ucitelj123</b>
+    </p>
+  </div>
+
+  <!-- UČENEC: DOMOV -->
+  <div id="studentHomeView" class="hidden">
+    <div class="header">
+      <div>
+        <h2>Pozdravljen, <span id="studentName"></span>! 👋</h2>
+        <div class="user-info" id="studentInfo"></div>
+      </div>
+      <button class="logout" onclick="logout()">Odjava</button>
+    </div>
+    <h3>Kaj želiš reševati?</h3>
+    <div class="big-btn-row">
+      <button class="big-btn domaca" onclick="openCategory('domaca')">
+        📘 Domače naloge
+        <span class="sub">Časovno omejene naloge</span>
+      </button>
+      <button class="big-btn utrjevanje" onclick="openCategory('utrjevanje')">
+        🏋️ Utrjevanje
+        <span class="sub">Vedno odprte naloge</span>
+      </button>
+    </div>
+    <button class="secondary" onclick="openStudentAnalysis()" style="margin-top:10px;">📊 Moja analiza</button>
+  </div>
+
+  <!-- UČENEC: SEZNAM SKLOPOV -->
+  <div id="studentChaptersView" class="hidden">
+    <div class="header">
+      <div>
+        <h2 id="categoryTitle"></h2>
+        <div class="user-info" id="categoryInfo"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="secondary" onclick="backToStudentHome()">← Nazaj</button>
+        <button class="logout" onclick="logout()">Odjava</button>
+      </div>
+    </div>
+    <div id="studentChapterList"></div>
+  </div>
+
+  <!-- UČITELJ -->
+  <div id="teacherHomeView" class="hidden">
+    <div class="header">
+      <div>
+        <h2>Učiteljski način</h2>
+        <div class="user-info">Upravljanje učencev in sklopov</div>
+      </div>
+      <button class="logout" onclick="logout()">Odjava</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTeacherTab('students', event)">👥 Učenci</button>
+      <button class="tab" onclick="switchTeacherTab('chapters', event)">📚 Sklopi</button>
+      <button class="tab" onclick="switchTeacherTab('analysis', event)">📊 Analize</button>
+    </div>
+
+    <div id="teacherStudents">
+      <h3>Dodaj učenca</h3>
+      <div class="row" style="flex-wrap:wrap;">
+        <input id="newFirstName" placeholder="Ime" style="flex:1;min-width:140px;">
+        <input id="newLastName" placeholder="Priimek" style="flex:1;min-width:140px;">
+        <select id="newGrade" style="flex:0 0 130px;">
+          <option value="6">6. razred</option>
+          <option value="7">7. razred</option>
+          <option value="8" selected>8. razred</option>
+          <option value="9">9. razred</option>
+        </select>
+        <button class="secondary" onclick="addStudent()" style="flex:0 0 auto;">+ Dodaj</button>
+      </div>
+      <div class="error" id="studentError"></div>
+      <div id="newStudentResult" class="hidden" style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:12px;"></div>
+
+      <h3 style="margin-top:20px;">Seznam učencev</h3>
+      <div class="row" style="margin-bottom:10px;flex-wrap:wrap;">
+        <select id="filterGrade" onchange="renderStudentsList()" style="max-width:200px;">
+          <option value="all">Vsi razredi</option>
+          <option value="6">6. razred</option>
+          <option value="7">7. razred</option>
+          <option value="8">8. razred</option>
+          <option value="9">9. razred</option>
+        </select>
+        <button class="secondary" onclick="exportPDF()">📄 Izvozi PDF</button>
+      </div>
+      <div id="studentsList"></div>
+    </div>
+
+    <div id="teacherChapters" class="hidden">
+      <h3>Dodaj sklop</h3>
+      <input id="newChapterTitle" placeholder="Naslov sklopa">
+      <input id="newChapterDesc" placeholder="Kratek opis (neobvezno)">
+      <select id="newChapterType" onchange="toggleTopicField()">
+        <option value="llm">LLM tutor (poljubna tema prek Groq)</option>
+        <option value="cela_stevila">Cela števila (vgrajen generator)</option>
+        <option value="generic">Splošno (brez tutorja)</option>
+      </select>
+      <select id="newChapterGrade">
+        <option value="6">6. razred</option>
+        <option value="7">7. razred</option>
+        <option value="8" selected>8. razred</option>
+        <option value="9">9. razred</option>
+      </select>
+      <select id="newChapterCategory" onchange="toggleDeadlineField()">
+        <option value="domaca">Domača naloga (časovno omejeno)</option>
+        <option value="utrjevanje">Utrjevanje (vedno odprto)</option>
+      </select>
+      <input id="newChapterDeadline" type="datetime-local">
+      <input id="newChapterTopic" placeholder="Tema za LLM (npr. Seštevanje ulomkov)">
+      <button class="secondary" onclick="addChapter()">+ Dodaj sklop</button>
+      <div class="error" id="chapterError" style="margin-top:8px;"></div>
+
+      <h3 style="margin-top:24px;">Vsi sklopi</h3>
+      <div id="teacherChapterList"></div>
+    </div>
+
+    <div id="teacherAnalysis" class="hidden">
+      <div class="tabs">
+        <button class="tab active" data-analysis-tab="grade" onclick="switchAnalysis('grade', event)">Po oddelku</button>
+        <button class="tab" data-analysis-tab="student" onclick="switchAnalysis('student', event)">Po učencu</button>
+        <button class="tab" data-analysis-tab="chapter" onclick="switchAnalysis('chapter', event)">Po sklopu</button>
+      </div>
+      <div id="analysisContent"></div>
+    </div>
+  </div>
+
+  <!-- NASTAVITVE SKLOPA -->
+  <div id="chapterSettingsView" class="hidden">
+    <div class="header">
+      <div>
+        <h2>⚙️ Nastavitve sklopa</h2>
+        <div class="user-info" id="settingsSubtitle"></div>
+      </div>
+      <button class="secondary" onclick="backToTeacherChapters()">← Nazaj</button>
+    </div>
+    <div class="settings-box">
+      <input id="editTitle" placeholder="Naslov">
+      <input id="editDesc" placeholder="Opis">
+      <select id="editType">
+        <option value="llm">LLM tutor</option>
+        <option value="cela_stevila">Cela števila</option>
+        <option value="generic">Splošno</option>
+      </select>
+      <select id="editGrade">
+        <option value="6">6. razred</option>
+        <option value="7">7. razred</option>
+        <option value="8">8. razred</option>
+        <option value="9">9. razred</option>
+      </select>
+      <select id="editCategory" onchange="toggleEditDeadline()">
+        <option value="domaca">Domača naloga</option>
+        <option value="utrjevanje">Utrjevanje</option>
+      </select>
+      <input id="editDeadline" type="datetime-local">
+      <input id="editTopic" placeholder="Tema za LLM">
+      <div class="row" style="margin-top:10px;">
+        <button class="success" onclick="saveChapterSettings()" style="flex:1;">💾 Shrani</button>
+        <button class="danger" onclick="deleteChapterSettings()" style="flex:0 0 auto;">🗑️ Izbriši</button>
+      </div>
+      <div class="error" id="settingsError" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- PODROBNA ANALIZA UČENCA -->
+  <div id="studentDetailView" class="hidden">
+    <div class="header">
+      <div>
+        <h2 id="studentDetailTitle">👤 Profil učenca</h2>
+        <div class="user-info" id="studentDetailSubtitle"></div>
+      </div>
+      <button class="secondary" onclick="backToTeacherAnalysis()">← Nazaj</button>
+    </div>
+    <div id="studentDetailContent"></div>
+  </div>
+
+  <!-- TUTOR -->
+  <div id="tutorView" class="hidden">
+    <div class="header">
+      <div>
+        <h2 id="tutorTitle"></h2>
+        <div class="user-info" id="tutorDesc"></div>
+      </div>
+      <button class="secondary" onclick="backToStudentList()">← Nazaj</button>
+    </div>
+    <div id="resumeBanner" class="resume-banner hidden"></div>
+    <div class="progress">
+      <span id="progressTasks"></span>
+      <span id="progressStats"></span>
+    </div>
+    <div class="task-box">
+      <div class="task-text" id="taskText"></div>
+      <div class="row">
+        <input id="answerInput" placeholder="Vpiši odgovor." onkeydown="if(event.key==='Enter') checkAnswer()">
+        <button style="width:auto; padding:12px 24px;" id="checkBtn" onclick="checkAnswer()">Preveri</button>
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div id="explanationBox"></div>
+    </div>
+    <div class="btn-row">
+      <button class="secondary" id="retryBtn" onclick="retrySimilar()" style="display:none;">Poskusi s podobno nalogo →</button>
+    </div>
+  </div>
+
+  <!-- UČENEC ANALIZA -->
+  <div id="studentAnalysisView" class="hidden">
+    <div class="header">
+      <div><h2>📊 Moja analiza</h2></div>
+      <button class="secondary" onclick="backToStudentHome()">← Nazaj</button>
+    </div>
+    <div id="studentAnalysisContent"></div>
+  </div>
+
+  <!-- MODAL: UREJANJE UČENCA -->
+  <div id="editStudentModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h3>✏️ Uredi učenca</h3>
+      <input id="editFirstName" placeholder="Ime">
+      <input id="editLastName" placeholder="Priimek">
+      <input id="editUsername" placeholder="Uporabniško ime (male črke in številke)">
+      <input id="editPassword" placeholder="Geslo">
+      <select id="editStudentGrade">
+        <option value="6">6. razred</option>
+        <option value="7">7. razred</option>
+        <option value="8">8. razred</option>
+        <option value="9">9. razred</option>
+      </select>
+      <div class="error" id="editStudentError"></div>
+      <div class="modal-actions">
+        <button class="success" onclick="saveStudentEdit()">💾 Shrani</button>
+        <button class="secondary" onclick="closeStudentEdit()">Prekliči</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var currentUser = null;
+var currentGrade = null;
+var currentCategory = null;
+var currentChapter = null;
+var currentTask = null;
+var llmState = { level: 1, correct: 0, target: 5, awaitingNext: false };
+var allChapters = [];
+var currentDetailUsername = null;
+var studentsList = [];
+var editingStudentUsername = null;
+
+function authHeaders() { return currentUser ? { 'x-admin-user': currentUser.username } : {}; }
+
+function renderMath(el) {
+  if (!el) return;
+  var attempts = 20;
+  var tryRender = function () {
+    if (window.MathJax && MathJax.typesetPromise) {
+      try { MathJax.typesetPromise([el]).catch(function () {}); } catch (e) {}
+    } else if (attempts > 0) {
+      attempts--;
+      setTimeout(tryRender, 200);
+    }
+  };
+  tryRender();
+}
+
+/* ============================================================
+   PRIJAVA
+   ============================================================ */
+function login() {
+  var u = document.getElementById('loginUser').value.trim();
+  var p = document.getElementById('loginPass').value;
+  var err = document.getElementById('loginError');
+  err.textContent = '';
+  fetch('/api/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: u, password: p })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { err.textContent = data.error; return; }
+      currentUser = data;
+      document.getElementById('loginView').classList.add('hidden');
+      if (data.role === 'admin') showTeacherHome();
+      else { currentGrade = data.grade; showStudentHome(); }
+    })
+    .catch(() => { err.textContent = 'Napaka pri povezavi.'; });
+}
+function logout() {
+  currentUser = null; currentGrade = null; currentCategory = null;
+  currentChapter = null; currentTask = null; allChapters = [];
+  currentDetailUsername = null; studentsList = []; editingStudentUsername = null;
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginView').classList.remove('hidden');
+  ['studentHomeView','studentChaptersView','teacherHomeView','chapterSettingsView',
+   'studentDetailView','tutorView','studentAnalysisView','editStudentModal'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+}
+
+/* ============================================================
+   UČENEC
+   ============================================================ */
+function showStudentHome() {
+  document.getElementById('studentHomeView').classList.remove('hidden');
+  document.getElementById('studentName').textContent = currentUser.firstName;
+  document.getElementById('studentInfo').textContent =
+    currentUser.firstName + ' ' + currentUser.lastName + ' – ' + currentGrade + '. razred';
+}
+function backToStudentHome() {
+  ['studentChaptersView','tutorView','studentAnalysisView'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('studentHomeView').classList.remove('hidden');
+}
+function openCategory(cat) {
+  currentCategory = cat;
+  document.getElementById('studentHomeView').classList.add('hidden');
+  document.getElementById('studentChaptersView').classList.remove('hidden');
+  document.getElementById('categoryTitle').textContent =
+    cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje';
+  document.getElementById('categoryInfo').textContent = 'Razred: ' + currentGrade + '.';
+
+  fetch('/api/chapters?grade=' + currentGrade)
+    .then(r => r.json())
+    .then(list => { allChapters = list; renderStudentChapterList(); })
+    .catch(() => { document.getElementById('studentChapterList').innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
+}
+function renderStudentChapterList() {
+  var el = document.getElementById('studentChapterList');
+  var list = allChapters.filter(c => c.category === currentCategory);
+  el.innerHTML = '';
+  if (!list.length) { el.innerHTML = '<p class="empty-note">Ni sklopov.</p>'; return; }
+  list.forEach(ch => {
+    var locked = ch.category === 'domaca' && ch.deadline && Date.now() > new Date(ch.deadline).getTime();
+    var div = document.createElement('div');
+    div.className = 'chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje ' : '') + (locked ? 'locked' : '');
+    var html = '<div class="chapter-left"><div class="chapter-title">' + ch.title + '</div><div class="chapter-desc">' + (ch.desc || '') + '</div>';
+    if (ch.deadline) html += '<div class="chapter-deadline">⏰ Rok: ' + new Date(ch.deadline).toLocaleString('sl-SI') + (locked ? ' (POTEKEL)' : '') + '</div>';
+    html += '</div>';
+    div.innerHTML = html;
+    if (!locked) div.onclick = () => openChapter(ch);
+    else div.onclick = () => alert('Rok je potekel.');
+    el.appendChild(div);
+  });
+}
+function backToStudentList() {
+  document.getElementById('tutorView').classList.add('hidden');
+  document.getElementById('studentChaptersView').classList.remove('hidden');
+}
+
+/* ============================================================
+   TUTOR
+   ============================================================ */
+function openChapter(ch) {
+  currentChapter = ch;
+  document.getElementById('studentChaptersView').classList.add('hidden');
+  document.getElementById('tutorView').classList.remove('hidden');
+  document.getElementById('tutorTitle').textContent = ch.title;
+  document.getElementById('tutorDesc').textContent = ch.desc || '';
+  document.getElementById('explanationBox').innerHTML = '';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('retryBtn').style.display = 'none';
+  document.getElementById('answerInput').disabled = true;
+  document.getElementById('answerInput').value = '';
+  document.getElementById('checkBtn').disabled = true;
+  document.getElementById('checkBtn').style.display = '';
+  document.getElementById('taskText').innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam ...</span>';
+  document.getElementById('resumeBanner').classList.add('hidden');
+
+  if (ch.type === 'llm' || ch.type === 'cela_stevila') startOrResumeSession(ch);
+  else document.getElementById('taskText').textContent = 'Za to poglavje tutor še ni na voljo.';
+}
+function startOrResumeSession(ch) {
+  fetch('/api/start-session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, chapterId: ch.id })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { document.getElementById('taskText').textContent = 'Napaka: ' + data.error; return; }
+      llmState.level = data.level || 1;
+      llmState.correct = data.correct || 0;
+      if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
+      if (data.hasCurrentTask && data.currentTask) {
+        currentTask = { question: data.currentTask.question, text: data.currentTask.question, level: data.currentTask.level };
+        var tt = document.getElementById('taskText');
+        tt.textContent = data.currentTask.question;
+        renderMath(tt);
+        var banner = document.getElementById('resumeBanner');
+        banner.textContent = '↩️ Nadaljuješ, kjer si končal. Pravilnih: ' + data.correct + '/5, raven: ' + data.level + '/5.';
+        banner.classList.remove('hidden');
+        if (data.currentTask.awaitingNext) {
+          document.getElementById('answerInput').disabled = true;
+          document.getElementById('checkBtn').disabled = true;
+          document.getElementById('checkBtn').style.display = 'none';
+          document.getElementById('retryBtn').style.display = '';
+        } else {
+          document.getElementById('answerInput').disabled = false;
+          document.getElementById('checkBtn').disabled = false;
+          document.getElementById('checkBtn').style.display = '';
+          document.getElementById('answerInput').focus();
+        }
+        updateProgressUI_LLM();
+      } else {
+        loadLLMTask(false);
+      }
+    })
+    .catch(() => { document.getElementById('taskText').textContent = 'Napaka pri povezavi.'; });
+}
+function updateProgressUI_LLM() {
+  document.getElementById('progressTasks').textContent = 'Pravilnih: ' + llmState.correct + ' / 5  •  Raven: ' + llmState.level + ' / 5';
+  document.getElementById('progressStats').textContent = currentChapter.title;
+}
+function loadLLMTask(isRetry) {
+  var tt = document.getElementById('taskText');
+  tt.innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam tvojo nalogo ...</span>';
+  document.getElementById('checkBtn').disabled = true;
+  document.getElementById('checkBtn').style.display = '';
+  document.getElementById('retryBtn').style.display = 'none';
+  document.getElementById('explanationBox').innerHTML = '';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('answerInput').disabled = true;
+
+  fetch('/api/generate-task', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id, isRetry: !!isRetry })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { tt.textContent = 'Napaka: ' + data.error; return; }
+      if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
+      currentTask = { question: data.question, text: data.question, level: data.level };
+      llmState.level = data.level;
+      llmState.correct = data.correct;
+      llmState.awaitingNext = false;
+      tt.textContent = data.question;
+      renderMath(tt);
+      var inp = document.getElementById('answerInput');
+      inp.value = ''; inp.disabled = false;
+      document.getElementById('checkBtn').disabled = false;
+      document.getElementById('checkBtn').style.display = '';
+      inp.focus();
+      updateProgressUI_LLM();
+    })
+    .catch(() => { tt.textContent = 'Napaka pri povezavi.'; });
+}
+function showLLMFinished(correct, attempts) {
+  document.getElementById('taskText').textContent = '🎉 Bravo! Rešil si vseh 5 nalog!';
+  document.getElementById('progressTasks').textContent = 'Seja zaključena';
+  document.getElementById('progressStats').textContent = 'Pravilnih: ' + correct + ' / 5  •  Poskusov: ' + attempts;
+  document.getElementById('answerInput').disabled = true;
+  document.getElementById('checkBtn').style.display = 'none';
+  document.getElementById('retryBtn').style.display = 'none';
+  document.getElementById('explanationBox').innerHTML =
+    '<div style="text-align:center;margin-top:15px;">' +
+    '<button class="secondary" onclick="startFresh()">Nova seja</button></div>';
+}
+function startFresh() {
+  fetch('/api/reset-session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id })
+  }).then(() => startOrResumeSession(currentChapter));
+}
+function checkAnswer() {
+  if (!currentTask) return;
+  var inp = document.getElementById('answerInput');
+  var raw = inp.value.trim();
+  if (raw === '') {
+    document.getElementById('feedback').className = 'feedback wrong';
+    document.getElementById('feedback').textContent = 'Vnesi odgovor.';
+    return;
+  }
+  var fb = document.getElementById('feedback');
+  inp.disabled = true;
+  document.getElementById('checkBtn').disabled = true;
+  document.getElementById('checkBtn').style.display = 'none';
+  fb.className = 'feedback';
+  fb.innerHTML = '<span class="loading"><span class="spinner"></span>Preverjam tvoj odgovor ...</span>';
+
+  fetch('/api/check-answer', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, userAnswer: raw })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { fb.className = 'feedback wrong'; fb.textContent = data.error; return; }
+      if (data.finished) {
+        fb.className = 'feedback correct';
+        fb.textContent = '✅ ' + data.message;
+        showLLMFinished(data.correctCount, data.attempts);
+        return;
+      }
+      if (data.correct) {
+        fb.className = 'feedback correct';
+        fb.textContent = '✅ ' + data.message;
+        llmState.correct = data.correctCount;
+        llmState.level = data.nextLevel;
+        document.getElementById('explanationBox').innerHTML = '';
+        setTimeout(() => { loadLLMTask(false); }, 1300);
+      } else {
+        fb.className = 'feedback wrong';
+        fb.textContent = '❌ ' + data.message;
+        var box = document.getElementById('explanationBox');
+        var html = '<div class="explanation"><b>Razlaga:</b>';
+        if (Array.isArray(data.steps) && data.steps.length) {
+          html += '<ol>';
+          data.steps.forEach(s => { html += '<li>' + s + '</li>'; });
+          html += '</ol>';
+        } else {
+          html += '<p>Pravilen odgovor je ' + (data.correctAnswerRaw || data.correctAnswer) + '.</p>';
+        }
+        html += '<div class="correct-answer">Pravilen odgovor: ' + (data.correctAnswerRaw || data.correctAnswer) + '</div>';
+        html += '</div>';
+        box.innerHTML = html;
+        renderMath(box);
+        llmState.awaitingNext = true;
+        document.getElementById('retryBtn').style.display = '';
+      }
+    })
+    .catch(() => { fb.className = 'feedback wrong'; fb.textContent = 'Napaka pri povezavi.'; });
+}
+function retrySimilar() {
+  document.getElementById('retryBtn').style.display = 'none';
+  document.getElementById('checkBtn').disabled = false;
+  document.getElementById('checkBtn').style.display = '';
+  document.getElementById('explanationBox').innerHTML = '';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  loadLLMTask(true);
+}
+
+/* ============================================================
+   UČENEC: ANALIZA
+   ============================================================ */
+function openStudentAnalysis() {
+  document.getElementById('studentHomeView').classList.add('hidden');
+  document.getElementById('studentAnalysisView').classList.remove('hidden');
+  var c = document.getElementById('studentAnalysisContent');
+  c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam ...</p>';
+  fetch('/api/student-analysis/' + currentUser.username)
+    .then(r => r.json())
+    .then(list => {
+      if (!list.length) { c.innerHTML = '<p class="empty-note">Še nimaš podatkov.</p>'; return; }
+      var html = '';
+      list.forEach(item => {
+        html += '<div class="detail-box" style="margin-bottom:16px;">';
+        html += '<h3>' + item.title + ' <span class="badge badge-grade">' + item.grade + '. r</span>' +
+                '<span class="badge ' + (item.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+                (item.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span></h3>';
+        html += '<div class="stats-grid">';
+        html += '<div class="stat-card"><div class="num">' + item.total + '</div><div class="lbl">Poskusov</div></div>';
+        html += '<div class="stat-card"><div class="num">' + item.correct + '</div><div class="lbl">Pravilnih</div></div>';
+        html += '<div class="stat-card"><div class="num ' + pctClass(item.pct) + '">' + item.pct + '%</div><div class="lbl">Uspešnost</div></div>';
+        html += '<div class="stat-card"><div class="num">' + item.correctFirst + '</div><div class="lbl">1. poskus</div></div>';
+        html += '</div>';
+        if (item.topErrors.length) {
+          html += '<h3 style="margin-top:16px;">Najpogostejše napake</h3>';
+          item.topErrors.forEach(e => {
+            html += '<div class="error-item"><b>' + e.question + '</b><br>Tvoj odgovor: ' + e.userAns +
+                    ' • Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>';
+          });
+        }
+        html += '</div>';
+      });
+      c.innerHTML = html;
+      renderMath(c);
+    })
+    .catch(() => { c.innerHTML = '<p class="empty-note">Napaka.</p>'; });
+}
+
+/* ============================================================
+   UČITELJ
+   ============================================================ */
+function showTeacherHome() {
+  document.getElementById('teacherHomeView').classList.remove('hidden');
+  loadStudents().then(() => switchTeacherTab('students'));
+}
+function switchTeacherTab(tab, ev) {
+  if (ev && ev.target) {
+    Array.from(document.querySelectorAll('#teacherHomeView > .tabs .tab')).forEach(t => t.classList.remove('active'));
+    ev.target.classList.add('active');
+  }
+  ['teacherStudents','teacherChapters','teacherAnalysis','studentDetailView','chapterSettingsView'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+  document.getElementById('teacherHomeView').classList.remove('hidden');
+  if (tab === 'students') { document.getElementById('teacherStudents').classList.remove('hidden'); renderStudentsList(); }
+  else if (tab === 'chapters') { document.getElementById('teacherChapters').classList.remove('hidden'); loadTeacherChapters(); }
+  else { document.getElementById('teacherAnalysis').classList.remove('hidden'); switchAnalysis('grade'); }
+}
+
+function loadStudents() {
+  return fetch('/api/students', { headers: authHeaders() })
+    .then(r => r.json())
+    .then(list => { studentsList = list; renderStudentsList(); return list; })
+    .catch(() => { studentsList = []; return []; });
+}
+function renderStudentsList() {
+  var filterEl = document.getElementById('filterGrade');
+  var filter = filterEl ? filterEl.value : 'all';
+  var filtered = filter === 'all' ? studentsList : studentsList.filter(s => s.grade === parseInt(filter, 10));
+  var el = document.getElementById('studentsList');
+  if (!filtered.length) { el.innerHTML = '<p class="empty-note">Ni učencev.</p>'; return; }
+  var html = '<table><thead><tr><th>Ime in priimek</th><th>Razred</th><th>Uporabniško ime</th><th>Geslo</th><th>Dejanja</th></tr></thead><tbody>';
+  filtered.forEach(s => {
+    html += '<tr class="student-row">' +
+      '<td>' + s.firstName + ' ' + s.lastName + '</td>' +
+      '<td>' + s.grade + '. r</td>' +
+      '<td><code>' + s.username + '</code></td>' +
+      '<td><code>' + s.password + '</code></td>' +
+      '<td><button class="secondary small" onclick="openStudentEdit(\'' + s.username + '\')">✏️</button> ' +
+      '<button class="danger small" onclick="deleteStudent(\'' + s.username + '\')">🗑️</button></td></tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+function addStudent() {
+  var firstName = document.getElementById('newFirstName').value.trim();
+  var lastName = document.getElementById('newLastName').value.trim();
+  var grade = document.getElementById('newGrade').value;
+  var err = document.getElementById('studentError');
+  err.textContent = '';
+  if (!firstName || !lastName) { err.textContent = 'Vnesi ime in priimek.'; return; }
+  fetch('/api/students', {
+    method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify({ firstName, lastName, grade })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { err.textContent = data.error; return; }
+      document.getElementById('newFirstName').value = '';
+      document.getElementById('newLastName').value = '';
+      var res = document.getElementById('newStudentResult');
+      res.classList.remove('hidden');
+      res.innerHTML = '✅ Ustvarjen: <b>' + data.firstName + ' ' + data.lastName + '</b> (' + data.grade + '. r) – uporabniško ime: <b>' + data.username + '</b>, geslo: <b>' + data.password + '</b>';
+      loadStudents();
+    });
+}
+
+/* ---- UREJANJE UČENCA (modal) ---- */
+function openStudentEdit(username) {
+  var s = studentsList.find(x => x.username === username);
+  if (!s) return;
+  editingStudentUsername = username;
+  document.getElementById('editFirstName').value = s.firstName;
+  document.getElementById('editLastName').value = s.lastName;
+  document.getElementById('editUsername').value = s.username;
+  document.getElementById('editPassword').value = s.password;
+  document.getElementById('editStudentGrade').value = s.grade;
+  document.getElementById('editStudentError').textContent = '';
+  document.getElementById('editStudentModal').classList.remove('hidden');
+}
+function closeStudentEdit() {
+  document.getElementById('editStudentModal').classList.add('hidden');
+  editingStudentUsername = null;
+}
+function saveStudentEdit() {
+  if (!editingStudentUsername) return;
+  var firstName = document.getElementById('editFirstName').value.trim();
+  var lastName = document.getElementById('editLastName').value.trim();
+  var newUsername = document.getElementById('editUsername').value.trim();
+  var password = document.getElementById('editPassword').value.trim();
+  var grade = document.getElementById('editStudentGrade').value;
+  var err = document.getElementById('editStudentError');
+  err.textContent = '';
+  if (!firstName || !lastName) { err.textContent = 'Vnesi ime in priimek.'; return; }
+  if (!newUsername) { err.textContent = 'Vnesi uporabniško ime.'; return; }
+  if (!password) { err.textContent = 'Vnesi geslo.'; return; }
+
+  fetch('/api/students/' + editingStudentUsername, {
+    method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify({ firstName, lastName, newUsername, password, grade })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { err.textContent = data.error; return; }
+      closeStudentEdit();
+      loadStudents();
+    })
+    .catch(() => { err.textContent = 'Napaka pri shranjevanju.'; });
+}
+
+function deleteStudent(username) {
+  if (!confirm('Res izbrišeš učenca ' + username + '?')) return;
+  fetch('/api/students/' + username, { method: 'DELETE', headers: authHeaders() }).then(() => loadStudents());
+}
+function exportPDF() {
+  var filterEl = document.getElementById('filterGrade');
+  var filter = filterEl ? filterEl.value : 'all';
+  if (filter === 'all') { alert('Izberi razred.'); return; }
+  window.open('/api/students/pdf/' + filter + '?x-admin-user=' + encodeURIComponent(currentUser.username), '_blank');
+}
+
+function toggleTopicField() {
+  document.getElementById('newChapterTopic').classList.toggle('hidden', document.getElementById('newChapterType').value !== 'llm');
+}
+function toggleDeadlineField() {
+  var c = document.getElementById('newChapterCategory').value;
+  document.getElementById('newChapterDeadline').classList.toggle('hidden', c !== 'domaca');
+}
+function loadTeacherChapters() {
+  fetch('/api/chapters').then(r => r.json()).then(list => { allChapters = list; renderTeacherChapterList(); })
+    .catch(() => { document.getElementById('teacherChapterList').innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
+}
+function renderTeacherChapterList() {
+  var el = document.getElementById('teacherChapterList');
+  if (!allChapters.length) { el.innerHTML = '<p class="empty-note">Ni sklopov.</p>'; return; }
+  var html = '';
+  [6, 7, 8, 9].forEach(g => {
+    var gch = allChapters.filter(c => c.grade === g);
+    if (!gch.length) return;
+    var opened = (g === currentGrade) ? ' open' : '';
+    html += '<details class="grade-group"' + opened + '>' +
+            '<summary>' + g + '. razred (' + gch.length + ')</summary>' +
+            '<div class="grade-body">';
+    gch.forEach(ch => {
+      var locked = ch.category === 'domaca' && ch.deadline && Date.now() > new Date(ch.deadline).getTime();
+      var safeTitle = (ch.title || '').replace(/'/g, "\\'");
+      html += '<div class="chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje ' : '') + '">' +
+        '<div class="chapter-left" style="cursor:pointer;" onclick="openChapterSettings(\'' + ch.id + '\')">' +
+        '<div class="chapter-title">' + ch.title +
+        '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+        (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span>' +
+        (locked ? '<span class="badge" style="background:#e74c3c;">ZAKLENJENO</span>' : '') +
+        '</div><div class="chapter-desc">' + (ch.desc || '') + '</div>';
+      if (ch.deadline) html += '<div class="chapter-deadline">⏰ ' + new Date(ch.deadline).toLocaleString('sl-SI') + '</div>';
+      html += '</div>' +
+        '<div class="chapter-actions">' +
+        '<button class="secondary" title="Nastavitve" onclick="openChapterSettings(\'' + ch.id + '\')">⚙️</button>' +
+        '<button class="del" title="Izbriši" onclick="quickDeleteChapter(\'' + ch.id + '\', \'' + safeTitle + '\')">🗑️</button>' +
+        '</div></div>';
+    });
+    html += '</div></details>';
+  });
+  el.innerHTML = html;
+}
+
+function quickDeleteChapter(id, title) {
+  if (!confirm('Res izbrišeš sklop "' + title + '"? Tega ni mogoče razveljaviti.')) return;
+  fetch('/api/chapters/' + id, { method: 'DELETE', headers: authHeaders() })
+    .then(r => r.json())
+    .then(function () { loadTeacherChapters(); })
+    .catch(function () { alert('Napaka pri brisanju.'); });
+}
+
+function addChapter() {
+  var title = document.getElementById('newChapterTitle').value.trim();
+  var desc = document.getElementById('newChapterDesc').value.trim();
+  var type = document.getElementById('newChapterType').value;
+  var grade = document.getElementById('newChapterGrade').value;
+  var category = document.getElementById('newChapterCategory').value;
+  var deadline = document.getElementById('newChapterDeadline').value;
+  var topic = document.getElementById('newChapterTopic').value.trim();
+  var err = document.getElementById('chapterError');
+  err.textContent = '';
+  if (!title) { err.textContent = 'Vnesi naslov.'; return; }
+  if (type === 'llm' && !topic) { err.textContent = 'Za LLM vnesi temo.'; return; }
+  if (category === 'domaca' && !deadline) { err.textContent = 'Za domačo določi rok.'; return; }
+  fetch('/api/chapters', {
+    method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify({ title, desc, type, grade, category, deadline, topic })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { err.textContent = data.error; return; }
+      document.getElementById('newChapterTitle').value = '';
+      document.getElementById('newChapterDesc').value = '';
+      document.getElementById('newChapterTopic').value = '';
+      document.getElementById('newChapterDeadline').value = '';
+      loadTeacherChapters();
+    });
+}
+
+var editingChapterId = null;
+function openChapterSettings(id) {
+  var ch = allChapters.find(c => c.id === id);
+  if (!ch) return;
+  editingChapterId = id;
+  document.getElementById('teacherHomeView').classList.add('hidden');
+  document.getElementById('studentDetailView').classList.add('hidden');
+  document.getElementById('chapterSettingsView').classList.remove('hidden');
+  document.getElementById('settingsSubtitle').textContent = ch.title;
+  document.getElementById('editTitle').value = ch.title;
+  document.getElementById('editDesc').value = ch.desc || '';
+  document.getElementById('editType').value = ch.type;
+  document.getElementById('editGrade').value = ch.grade;
+  document.getElementById('editCategory').value = ch.category;
+  document.getElementById('editDeadline').value = ch.deadline ? toLocalDatetime(ch.deadline) : '';
+  document.getElementById('editTopic').value = ch.topic || '';
+  document.getElementById('settingsError').textContent = '';
+  toggleEditDeadline();
+}
+function toLocalDatetime(iso) {
+  var d = new Date(iso);
+  var pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function toggleEditDeadline() {
+  document.getElementById('editDeadline').classList.toggle('hidden', document.getElementById('editCategory').value !== 'domaca');
+}
+function backToTeacherChapters() {
+  document.getElementById('chapterSettingsView').classList.add('hidden');
+  document.getElementById('teacherHomeView').classList.remove('hidden');
+  switchTeacherTab('chapters');
+}
+function saveChapterSettings() {
+  var payload = {
+    title: document.getElementById('editTitle').value.trim(),
+    desc: document.getElementById('editDesc').value.trim(),
+    type: document.getElementById('editType').value,
+    grade: document.getElementById('editGrade').value,
+    category: document.getElementById('editCategory').value,
+    deadline: document.getElementById('editDeadline').value || null,
+    topic: document.getElementById('editTopic').value.trim()
+  };
+  var err = document.getElementById('settingsError');
+  err.textContent = '';
+  if (!payload.title) { err.textContent = 'Naslov je obvezen.'; return; }
+  if (payload.category === 'domaca' && !payload.deadline) { err.textContent = 'Za domačo določi rok.'; return; }
+  fetch('/api/chapters/' + editingChapterId, {
+    method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify(payload)
+  })
+    .then(r => r.json())
+    .then(data => { if (data.error) { err.textContent = data.error; return; } backToTeacherChapters(); });
+}
+function deleteChapterSettings() {
+  if (!confirm('Res izbrišeš ta sklop?')) return;
+  fetch('/api/chapters/' + editingChapterId, { method: 'DELETE', headers: authHeaders() }).then(() => backToTeacherChapters());
+}
+
+/* ============================================================
+   ANALIZE (učitelj)
+   ============================================================ */
+function switchAnalysis(mode, ev) {
+  Array.from(document.querySelectorAll('#teacherAnalysis [data-analysis-tab]')).forEach(t => t.classList.remove('active'));
+  var activeBtn = document.querySelector('#teacherAnalysis [data-analysis-tab="' + mode + '"]');
+  if (activeBtn) activeBtn.classList.add('active');
+
+  if (!studentsList.length) {
+    loadStudents().then(() => _runAnalysisMode(mode));
+  } else {
+    _runAnalysisMode(mode);
+  }
+}
+function _runAnalysisMode(mode) {
+  if (mode === 'grade') renderTeacherByGrade();
+  else if (mode === 'student') renderTeacherByStudent();
+  else if (mode === 'chapter') renderTeacherByChapter();
+}
+
+function renderTeacherByGrade() {
+  var c = document.getElementById('analysisContent');
+  c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam ...</p>';
+  fetch('/api/teacher-analysis', { headers: authHeaders() })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
+      var html = '<h3>Uspešnost po oddelkih</h3>';
+      var any = false;
+      [6, 7, 8, 9].forEach(g => {
+        var gd = data.byGrade[g];
+        if (!gd || !gd.total) { html += '<div class="detail-box"><b>' + g + '. razred</b> – še ni podatkov.</div>'; return; }
+        any = true;
+        var pct = Math.round(100 * gd.correct / gd.total);
+        html += '<div class="detail-box" style="margin-bottom:14px;">';
+        html += '<h3>' + g + '. razred <span class="pct ' + pctClass(pct) + '">' + pct + '% (' + gd.correct + '/' + gd.total + ')</span></h3>';
+        html += '<div class="bar-container"><div class="bar-fill" style="width:' + pct + '%"></div></div>';
+        html += '<div style="margin-top:10px;">';
+        Object.keys(gd.chapters).forEach(chId => {
+          var chd = gd.chapters[chId];
+          var cp = chd.total ? Math.round(100 * chd.correct / chd.total) : 0;
+          html += '<div class="type-row"><span>' + chd.title + '</span><span class="pct ' + pctClass(cp) + '">' + cp + '%</span></div>';
+          html += '<div class="bar-container"><div class="bar-fill" style="width:' + cp + '%"></div></div>';
+        });
+        html += '</div></div>';
+      });
+      if (!any) html += '<p class="empty-note">Še ni podatkov o reševanju.</p>';
+      c.innerHTML = html;
+    })
+    .catch(() => { c.innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
+}
+
+function renderTeacherByStudent() {
+  var c = document.getElementById('analysisContent');
+  c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam ...</p>';
+  fetch('/api/teacher-analysis', { headers: authHeaders() })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
+      var html = '<h3>Uspešnost po učencih</h3>';
+      html += '<p class="user-info" style="margin-bottom:12px;">Klikni »Podrobno« za celoten profil učenca.</p>';
+      html += '<table><thead><tr><th>Učenec</th><th>Poskusi</th><th>Pravilnih</th><th>Uspešnost</th><th></th></tr></thead><tbody>';
+      var any = false;
+      Object.keys(data.byStudent).sort().forEach(u => {
+        var s = data.byStudent[u];
+        if (!s.total) return;
+        any = true;
+        var p = Math.round(100 * s.correct / s.total);
+        var name = studentsList.find(x => x.username === u);
+        var display = name ? name.firstName + ' ' + name.lastName : u;
+        html += '<tr><td>' + display + '</td><td>' + s.total + '</td><td>' + s.correct +
+                '</td><td><span class="pct ' + pctClass(p) + '">' + p + '%</span></td>' +
+                '<td><button class="secondary small" onclick="openStudentDetail(\'' + u + '\')">Podrobno →</button></td></tr>';
+      });
+      html += '</tbody></table>';
+      if (!any) html = '<p class="empty-note">Še ni podatkov o reševanju.</p>';
+      c.innerHTML = html;
+    })
+    .catch(() => { c.innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
+}
+
+function renderTeacherByChapter() {
+  var c = document.getElementById('analysisContent');
+  if (!allChapters.length) {
+    c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam sklope ...</p>';
+    fetch('/api/chapters').then(r => r.json()).then(list => {
+      allChapters = list;
+      _renderChapterListForAnalysis();
+    });
+  } else {
+    _renderChapterListForAnalysis();
+  }
+}
+function _renderChapterListForAnalysis() {
+  var c = document.getElementById('analysisContent');
+  if (!allChapters.length) { c.innerHTML = '<p class="empty-note">Ni sklopov.</p>'; return; }
+  var html = '<h3>Analiza sklopa</h3><p class="user-info" style="margin-bottom:12px;">Klikni na sklop za poglobljeno analizo.</p>';
+  allChapters.forEach(ch => {
+    html += '<div class="chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje' : '') + '" onclick="runChapterAnalysis(\'' + ch.id + '\')">' +
+      '<div class="chapter-left"><div class="chapter-title">' + ch.title +
+      '<span class="badge badge-grade">' + ch.grade + '. r</span>' +
+      '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+      (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span></div>' +
+      '<div class="chapter-desc">' + (ch.desc || '') + '</div></div></div>';
+  });
+  c.innerHTML = html;
+}
+
+function runChapterAnalysis(chapterId) {
+  var c = document.getElementById('analysisContent');
+  c.innerHTML = '<p class="loading"><span class="spinner"></span>Generiram analizo ...</p>';
+  fetch('/api/chapter-analysis/' + chapterId, {
+    method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders())
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
+      var html = '<div class="detail-box">';
+      html += '<h3>' + data.title + ' <span class="badge badge-grade">' + data.grade + '. r</span></h3>';
+      html += '<div class="stats-grid">';
+      html += '<div class="stat-card"><div class="num">' + data.totalAttempts + '</div><div class="lbl">Poskusov</div></div>';
+      html += '<div class="stat-card"><div class="num">' + data.activeStudents + '</div><div class="lbl">Aktivnih</div></div>';
+      html += '<div class="stat-card"><div class="num ' + pctClass(data.pct) + '">' + data.pct + '%</div><div class="lbl">Uspešnost</div></div>';
+      html += '</div>';
+      if (data.text) html += '<h3>Pedagoška analiza</h3><div class="analysis-text">' + data.text + '</div>';
+      if (data.topClassErrors && data.topClassErrors.length) {
+        html += '<h3 style="margin-top:16px;">Najpogostejše napake</h3>';
+        data.topClassErrors.forEach(e => {
+          html += '<div class="error-item"><b>' + e.question + '</b><br>Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>';
+        });
+      }
+      html += '<h3 style="margin-top:16px;">Po učencih</h3><table><thead><tr><th>Učenec</th><th>Poskusi</th><th>Pravilnih</th><th>Uspešnost</th></tr></thead><tbody>';
+      if (!data.perStudent.length) {
+        html += '<tr><td colspan="4" class="empty-note">Ni podatkov.</td></tr>';
+      } else {
+        data.perStudent.forEach(p => {
+          var name = studentsList.find(x => x.username === p.username);
+          html += '<tr><td>' + (name ? name.firstName + ' ' + name.lastName : p.username) + '</td><td>' + p.total +
+                  '</td><td>' + p.correct + '</td><td><span class="pct ' + pctClass(p.pct) + '">' + p.pct + '%</span></td></tr>';
+        });
+      }
+      html += '</tbody></table></div>';
+      c.innerHTML = html;
+      renderMath(c);
+    })
+    .catch(() => { c.innerHTML = '<p class="empty-note">Napaka pri analizi.</p>'; });
+}
+
+/* ============================================================
+   PODROBNA ANALIZA UČENCA (profil)
+   ============================================================ */
+function openStudentDetail(username) {
+  currentDetailUsername = username;
+  document.getElementById('teacherHomeView').classList.add('hidden');
+  document.getElementById('chapterSettingsView').classList.add('hidden');
+  document.getElementById('studentDetailView').classList.remove('hidden');
+  var content = document.getElementById('studentDetailContent');
+  content.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam profil ...</p>';
+
+  fetch('/api/student-detail/' + username, { headers: authHeaders() })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { content.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
+      document.getElementById('studentDetailTitle').textContent =
+        '👤 ' + data.firstName + ' ' + data.lastName;
+      document.getElementById('studentDetailSubtitle').textContent =
+        data.grade + '. razred  •  ' + data.overall.total + ' poskusov  •  skupna uspešnost ' + data.overall.pct + '%';
+
+      var html = '';
+      html += '<div class="stats-grid">';
+      html += '<div class="stat-card"><div class="num">' + data.overall.total + '</div><div class="lbl">Vseh poskusov</div></div>';
+      html += '<div class="stat-card"><div class="num">' + data.overall.correct + '</div><div class="lbl">Pravilnih</div></div>';
+      html += '<div class="stat-card"><div class="num ' + pctClass(data.overall.pct) + '">' + data.overall.pct + '%</div><div class="lbl">Uspešnost</div></div>';
+      html += '<div class="stat-card"><div class="num">' + data.chapters.length + '</div><div class="lbl">Sklopov</div></div>';
+      html += '</div>';
+
+      if (!data.chapters.length) {
+        html += '<p class="empty-note">Učenec še ni reševal nobenega sklopa.</p>';
+        content.innerHTML = html;
+        return;
+      }
+
+      ['domaca', 'utrjevanje'].forEach(cat => {
+        var list = data.chapters.filter(c => c.category === cat);
+        if (!list.length) return;
+        html += '<h3 style="margin-top:20px;color:' + (cat === 'domaca' ? '#3498db' : '#27ae60') + ';">' +
+                (cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje') + '</h3>';
+        list.forEach(ch => {
+          html += '<div class="chapter" onclick="toggleChapterDetail(\'' + ch.chapterId + '\')">' +
+            '<div class="chapter-left">' +
+            '<div class="chapter-title">' + ch.title +
+            '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+            (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span>' +
+            '</div>' +
+            '<div class="chapter-desc">' + ch.total + ' poskusov • ' + ch.correct + ' pravilnih • ' +
+            ch.correctFirst + ' pravilnih v 1. poskusu</div>' +
+            '</div>' +
+            '<div class="pct ' + pctClass(ch.pct) + '" style="font-size:20px;">' + ch.pct + '%</div>' +
+            '</div>';
+          html += '<div id="chapterDetail_' + ch.chapterId + '" class="detail-box hidden" style="margin-bottom:12px;"></div>';
+        });
+      });
+
+      content.innerHTML = html;
+      content._detailData = data;
+    })
+    .catch(() => { content.innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
+}
+
+function toggleChapterDetail(chapterId) {
+  var el = document.getElementById('chapterDetail_' + chapterId);
+  if (!el) return;
+  if (!el.classList.contains('hidden')) { el.classList.add('hidden'); return; }
+  var data = document.getElementById('studentDetailContent')._detailData;
+  if (!data) return;
+  var ch = data.chapters.find(c => c.chapterId === chapterId);
+  if (!ch) return;
+
+  var html = '';
+  html += '<div class="stats-grid">';
+  html += '<div class="stat-card"><div class="num">' + ch.total + '</div><div class="lbl">Poskusov</div></div>';
+  html += '<div class="stat-card"><div class="num">' + ch.correct + '</div><div class="lbl">Pravilnih</div></div>';
+  html += '<div class="stat-card"><div class="num">' + ch.correctFirst + '</div><div class="lbl">1. poskus</div></div>';
+  html += '<div class="stat-card"><div class="num ' + pctClass(ch.pct) + '">' + ch.pct + '%</div><div class="lbl">Uspešnost</div></div>';
+  html += '</div>';
+
+  if (ch.byType && ch.byType.length) {
+    html += '<h3>Uspešnost po tipu naloge</h3>';
+    ch.byType.forEach(t => {
+      html += '<div class="type-row"><span>' + typeLabel(t.type) + ' (' + t.total + ')</span>' +
+              '<span class="type-pct pct ' + pctClass(t.pct) + '">' + t.pct + '%</span></div>';
+      html += '<div class="bar-container"><div class="bar-fill" style="width:' + t.pct + '%"></div></div>';
+    });
+  }
+
+  if (ch.topErrors && ch.topErrors.length) {
+    html += '<h3 style="margin-top:14px;">Najpogostejše napake</h3>';
+    ch.topErrors.forEach(e => {
+      html += '<div class="error-item"><b>' + e.question + '</b><br>' +
+        'Napačno: ' + e.userAns + ' • Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>';
+    });
+  }
+
+  if (ch.recentHistory && ch.recentHistory.length) {
+    html += '<h3 style="margin-top:14px;">Zadnji poskusi</h3>';
+    ch.recentHistory.forEach(h => {
+      html += '<div class="history-item ' + (h.ok ? 'ok' : 'fail') + '">' +
+        '<span class="history-q">' + h.question + '</span>' +
+        '<span class="badge-' + (h.ok ? 'ok' : 'fail') + '">' + (h.ok ? '✓' : '✗') + '</span></div>';
+    });
+  }
+
+  el.innerHTML = html;
+  el.classList.remove('hidden');
+  renderMath(el);
+}
+
+function backToTeacherAnalysis() {
+  document.getElementById('studentDetailView').classList.add('hidden');
+  document.getElementById('teacherHomeView').classList.remove('hidden');
+  switchTeacherTab('analysis');
+}
+
+function pctClass(p) { return p >= 75 ? 'good' : (p >= 50 ? 'mid' : 'bad'); }
+function typeLabel(t) {
+  return { add: 'Seštevanje', sub: 'Odštevanje', mul: 'Množenje', div: 'Deljenje', llm: 'LLM naloge' }[t] || t;
+}
+</script>
+</body>
+</html>

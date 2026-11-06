@@ -1,0 +1,16 @@
+{
+  "name": "matematicni-tutor-groq",
+  "version": "6.0.0",
+  "description": "Matematični tutor (Groq)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mongodb": "^7.8.0",
+    "openai": "^4.67.0",
+    "pdfkit": "^0.15.0"
+  }
+}
