@@ -132,16 +132,12 @@ function sketchHasNumbers(sketch) {
   return false;
 }
 
-function hasSketchData(sketch) {
-  return !!(sketch && sketch.type);
-}
+function hasSketchData(sketch) { return !!(sketch && sketch.type); }
 
 function validateSketch(question, sketch) {
   if (!sketch || !sketch.type) return { ok: true };
   const data = sketch.data || {};
-  const hasNumbersInSketch = sketchHasNumbers(sketch);
-  const hasNumbersInText = textHasNumbers(question);
-  if (hasNumbersInSketch && hasNumbersInText) {
+  if (sketchHasNumbers(sketch) && textHasNumbers(question)) {
     return { ok: false, reason: 'Skica in besedilo hkrati vsebujeta številke (podvajanje podatkov).' };
   }
   if (sketch.type === 'triangle') {
@@ -155,20 +151,119 @@ function validateSketch(question, sketch) {
 }
 
 /* ============================================================
-   UČNI NAČRT PO RAZREDIH (povzetek kazal iUčbenikov)
+   UČNI NAČRT – RAZŠIRJEN S PRIMERI NALOG (brez RAG)
    ============================================================ */
 const CURRICULUM_BY_GRADE = {
-  6: `6. razred OŠ – Matematika 6 (iUčbenik: eucbeniki.sio.si/matematika6)
-POGLAVJA: Naravna števila (velika števila, urejenost in primerjanje, rimske številke, zaokroževanje, večkratniki in delitelji, pravila deljivosti, seštevanje in odštevanje, množenje in potence, deljenje, zakoni računanja, zakon o razčlenjevanju, besedilne naloge, uporaba računala); Enačbe in neenačbe (izrazi s spremenljivkami, enačbe, reševanje enačb, neenačbe, besedilne naloge); Geometrija v ravnini (točka, premica, daljica, pravokotnice, vzporednice, razdalja, razdalja med vzporednicama); Ulomki in decimalni zapis (ulomki so deli celote, ulomki na številski premici, ulomki kot merska števila, desetiški ulomki, decimalne številke in desetiški ulomki, primerjanje in urejanje, zaokroževanje, računalo in decimalne številke); Količine in merjenje (denar, merimo čas, tehtamo maso, računamo z maso, dolžine, računamo z dolžinami, ploščine, računamo s ploščinami, prostornina, računamo s prostornino); Računamo z decimalnimi števili (seštevanje decimalnih števil, odštevanje decimalnih števil, množenje in deljenje z 10^n, množenje decimalnih števil, ulomek je količnik naravnih števil, deljenje decimalnih števil, številski izrazi brez oklepajev, številski izrazi z oklepaji, računamo z računalom, besedilne naloge, izrazi s spremenljivko); Povezanost količin (razmerje količin, sklepanje); Liki in telesa (obsegi likov, ploščine likov, kvader, kocka, površina kvadra, površina kocke, prostornina kvadra in kocke); Krog in kot (koti, primerjanje kotov, skladnost, vrste kotov, merjenje kotov, načrtovanje kotov, računanje s koti, krožnica, krog, premica in krožnica, tetiva, izsek, odsek); Obdelava podatkov (zbiranje in urejanje podatkov, razvrščanje, preiskave, kombinatorične situacije).`,
-
-  7: `7. razred OŠ – Matematika 7 (iUčbenik: eucbeniki.sio.si/matematika7)
-POGLAVJA: Naravna števila (praštevila, največji skupni delitelj, najmanjši skupni večkratnik, naloge z besedilom); Racionalna števila (ulomek je število, krajšanje ulomkov, razširjanje ulomkov, najmanjši skupni imenovalec, primerjanje ulomkov, desetiški in nedesetiški ulomki); Transformacije ravnine (usmerjenost in orientacija, premik in zasuk, zrcaljenje čez premico, zrcaljenje čez točko, osna in središčna simetričnost, simetrala daljice, simetrala kota, dvojice kotov); Seštevanje in odštevanje ulomkov (seštevanje in odštevanje ulomkov, ulomki z različnimi imenovalci, lastnosti seštevanja in odštevanja, naloge z besedilom); Množenje in deljenje ulomkov (množenje ulomka z naravnim številom, množenje ulomka z ulomkom, obratna ulomka, deljenje ulomkov, lastnosti množenja in deljenja, zakon o razčlenjevanju, številski izrazi brez oklepajev, številski izrazi z oklepaji, naloge z besedilom, sklepanje); Izrazi in enačbe (izrazi s spremenljivko, računanje s spremenljivkami, izrazi, enačbe in neenačbe, enačbe s seštevanjem in odštevanjem, enačbe z množenjem in deljenjem); Trikotniki (opis trikotnika, vrste trikotnikov, načrtovanje trikotnikov, višina trikotnika, trikotniku očrtana krožnica, trikotniku včrtana krožnica, težišče trikotnika, obseg trikotnika, ploščina trikotnika); Odstotek (zapis deleža z odstotkom, računanje z odstotki, spremembe in odstotki, računanje osnove, grafični prikaz odstotkov); Odvisnost količin in podatki (koordinatna mreža, odvisnost količin, zbiranje in urejanje podatkov, aritmetična sredina, kombinatorične situacije); Štirikotniki (štirikotniki, vrste štirikotnikov, načrtovanje štirikotnikov, paralelogram, obseg in ploščina paralelograma, trapez, obseg in ploščina trapeza, deltoid, obseg in ploščina deltoida, liki in telesa).`,
-
-  8: `8. razred OŠ – Matematika 8 (iUčbenik: eucbeniki.sio.si/mat8)
-POGLAVJA: Racionalna števila (cela števila, racionalna števila, absolutna in nasprotna vrednost, urejanje racionalnih števil); Računske operacije (seštevanje števil z enakimi predznaki, seštevanje števil z različnimi predznaki, odštevanje racionalnih števil, prištevanje in odštevanje številskih izrazov, izrazi s seštevanjem in odštevanjem, množenje racionalnih števil, deljenje racionalnih števil, številski izrazi z racionalnimi števili, zakon o razčlenjevanju); Potence (potence in izrazi, potence z enako osnovo, velika in majhna števila, potence z enako stopnjo, kvadriranje, kvadratni koren, približki korenov, iracionalna in realna števila, delno korenjenje in racionalizacija); Izrazi s spremenljivko (spremenljivke, izrazi, množenje enočlenikov, seštevanje enočlenikov, prištevanje in odštevanje izraza, množenje enočlenika z veččlenikom, izpostavljanje skupnega faktorja); Enačbe in neenačbe (enačbe in neenačbe, reševanje enačb, identična in ekvivalentna enačba); Večkotniki (večkotniki, diagonale in koti večkotnika, pravilni večkotniki, obseg in ploščina večkotnikov); Odvisnost količin in sorazmerja (koordinate točk na premici in v ravnini, odvisnost in ponazarjanje količin, premo sorazmerje, graf premo sorazmernih količin, premo sorazmerje in odstotki, obratno sorazmerje, graf obratno sorazmernih količin); Podatki (obdelava podatkov, aritmetična sredina, povezanost spremenljivk, preiskave); Krog in krožnica (obseg kroga, ploščina kroga, krožni lok, krožni izsek); Pitagorov izrek (Pitagorov izrek, dolžine stranic, pravokotnik in kvadrat, enakokraki trikotnik, enakostranični trikotnik, Pitagorov izrek v rombu, v enakokrakem trapezu, v deltoidu, v koordinatnem sistemu); Kocka in kvader (lastnosti kocke, površina kocke, prostornina kocke, lastnosti kvadra, površina kvadra, prostornina kvadra, diagonalni preseki kvadra in kocke).`,
-
-  9: `9. razred OŠ – Matematika 9 (iUčbenik: eucbeniki.sio.si/mat9)
-POGLAVJA: Izrazi (množenje veččlenikov, kvadrat dvočlenika, produkt vsote in razlike, razstavljanje, algebrski ulomki); Enačbe in neenačbe (linearna enačba, ekvivalentno preoblikovanje enačb, enačbe z oklepaji, enačbe z ulomki, enačbe s kvadrati števil, formule, enačbe s parametri, neenačbe, besedilne naloge s števili, o geometriji, o starosti, uporaba enačb); Geometrijski elementi v prostoru (geometrija v ravnini in prostoru, ravnina in prostor, razdalja v prostoru); Linearna funkcija (koordinatni sistem, funkcija, premo sorazmerje je funkcija, obratno sorazmerje je funkcija, linearna funkcija, začetna vrednost, smerni koeficient, enačba premice, ničla linearne funkcije, presečišče premic, sistem linearnih enačb); Obdelava podatkov (podatki in vprašalniki, srednje vrednosti podatkov, škatla z brki, priprava in izvedba ankete); Razmerje in podobnost (razmerje količin, sorazmerje, premo sorazmerje, obratno sorazmerje, podobnost, podobni trikotniki, načrtovanje podobnih trikotnikov, Talesovi izreki, delitev daljice); Oglata telesa (prizma, mreža in površina prizme, prostornina prizme, piramida, mreža in površina piramide, prostornina piramide, 4-strana in 3-strana piramida, sestavljena telesa); Okrogla telesa (valj, mreža in površina valja, prostornina valja, stožec, mreža in površina stožca, prostornina stožca, sestavljena telesa, krogla); Verjetnost in kombinatorika (poskus, dogodek, izid, računanje verjetnosti).`
+  6: {
+    title: '6. razred OŠ – Matematika 6',
+    source: 'https://eucbeniki.sio.si/matematika6',
+    topics: [
+      'Naravna števila: velika števila, urejenost, primerjanje, rimske številke, zaokroževanje, večkratniki in delitelji, pravila deljivosti, seštevanje in odštevanje, množenje in potence, deljenje, zakoni računanja, zakon o razčlenjevanju, besedilne naloge, uporaba računala',
+      'Enačbe in neenačbe: izrazi s spremenljivkami, enačbe, reševanje enačb, neenačbe, besedilne naloge',
+      'Geometrija v ravnini: točka, premica, daljica, pravokotnice, vzporednice, razdalja, razdalja med vzporednicama',
+      'Ulomki in decimalni zapis: ulomki so deli celote, ulomki na številski premici, ulomki kot merska števila, desetiški ulomki, decimalne številke, primerjanje in urejanje, zaokroževanje',
+      'Količine in merjenje: denar, merimo čas, tehtamo maso, računamo z maso, dolžine, računamo z dolžinami, ploščine, računamo s ploščinami, prostornina, računamo s prostornino',
+      'Računanje z decimalnimi števili: seštevanje, odštevanje, množenje in deljenje z 10^n, množenje decimalnih števil, ulomek je količnik naravnih števil, deljenje decimalnih števil, številski izrazi brez/z oklepaji',
+      'Povezanost količin: razmerje količin, sklepanje',
+      'Liki in telesa: obsegi likov, ploščine likov, kvader, kocka, površina kvadra, površina kocke, prostornina kvadra in kocke',
+      'Krog in kot: koti, primerjanje kotov, skladnost, vrste kotov, merjenje kotov, načrtovanje kotov, računanje s koti, krožnica, krog, premica in krožnica, tetiva, izsek, odsek',
+      'Obdelava podatkov: zbiranje in urejanje podatkov, razvrščanje, preiskave, kombinatorične situacije'
+    ],
+    examples: [
+      'Izračunaj: 3 456 + 2 789 − 1 234.',
+      'Katero število je zaokroženo na stotice enako 4 500?',
+      'Pravokotnik ima stranici a = 8 cm in b = 5 cm. Izračunaj obseg in ploščino.',
+      'Kocka ima rob a = 3 cm. Izračunaj površino in prostornino.',
+      'Koliko je 2/5 od 30?',
+      'Mama je kupila 2,5 kg jabolk in 1,75 kg hrušk. Koliko sadja je kupila skupaj?',
+      'Pretvori 3,5 km v metre.',
+      'V košari je 12 rdečih in 8 zelenih jabolk. Koliko je vseh jabolk?'
+    ]
+  },
+  7: {
+    title: '7. razred OŠ – Matematika 7',
+    source: 'https://eucbeniki.sio.si/matematika7',
+    topics: [
+      'Naravna števila: praštevila, največji skupni delitelj, najmanjši skupni večkratnik, naloge z besedilom',
+      'Racionalna števila: ulomek je število, krajšanje, razširjanje, najmanjši skupni imenovalec, primerjanje ulomkov, desetiški in nedesetiški ulomki',
+      'Transformacije ravnine: usmerjenost in orientacija, premik in zasuk, zrcaljenje čez premico, zrcaljenje čez točko, osna in središčna simetričnost, simetrala daljice, simetrala kota, dvojice kotov',
+      'Seštevanje in odštevanje ulomkov: seštevanje, odštevanje, ulomki z različnimi imenovalci, lastnosti, naloge z besedilom',
+      'Množenje in deljenje ulomkov: množenje ulomka z naravnim številom, množenje ulomka z ulomkom, obratna ulomka, deljenje ulomkov, lastnosti, zakon o razčlenjevanju, številski izrazi brez/z oklepaji',
+      'Izrazi in enačbe: izrazi s spremenljivko, računanje s spremenljivkami, enačbe s seštevanjem in odštevanjem, enačbe z množenjem in deljenjem',
+      'Trikotniki: opis trikotnika, vrste trikotnikov, načrtovanje, višina, očrtana in včrtana krožnica, težišče, obseg trikotnika, ploščina trikotnika',
+      'Odstotek: zapis deleža z odstotkom, računanje z odstotki, spremembe in odstotki, računanje osnove, grafični prikaz',
+      'Odvisnost količin in podatki: koordinatna mreža, odvisnost količin, zbiranje in urejanje podatkov, aritmetična sredina, kombinatorične situacije',
+      'Štirikotniki: vrste štirikotnikov, načrtovanje, paralelogram, obseg in ploščina paralelograma, trapez, obseg in ploščina trapeza, deltoid, obseg in ploščina deltoida'
+    ],
+    examples: [
+      'Izračunaj največji skupni delitelj števil 24 in 36.',
+      'Izračunaj: 2/3 + 1/4.',
+      'Izračunaj: 3/5 · 10/9.',
+      'Reši enačbo: x + 12 = 25.',
+      'Trikotnik ima stranice a = 5 cm, b = 6 cm, c = 7 cm. Izračunaj obseg.',
+      'Trikotnik ima osnovnico a = 8 cm in višino v = 4 cm. Izračunaj ploščino.',
+      'Koliko je 15 % od 200?',
+      'Paralelogram ima osnovnico a = 6 cm in višino v = 4 cm. Izračunaj ploščino.',
+      'V razredu je 25 učencev. Povprečna ocena pri matematiki je 3,8. Koliko je vsota vseh ocen?'
+    ]
+  },
+  8: {
+    title: '8. razred OŠ – Matematika 8',
+    source: 'https://eucbeniki.sio.si/mat8',
+    topics: [
+      'Racionalna števila: cela števila, racionalna števila, absolutna in nasprotna vrednost, urejanje',
+      'Računske operacije: seštevanje števil z enakimi predznaki, seštevanje števil z različnimi predznaki, odštevanje racionalnih števil, prištevanje in odštevanje izrazov, množenje racionalnih števil, deljenje racionalnih števil, zakon o razčlenjevanju',
+      'Potence: potence z enako osnovo, velika in majhna števila, potence z enako stopnjo, kvadriranje, kvadratni koren, približki korenov, iracionalna in realna števila, delno korenjenje in racionalizacija',
+      'Izrazi s spremenljivko: spremenljivke, množenje enočlenikov, seštevanje enočlenikov, prištevanje in odštevanje izraza, množenje enočlenika z veččlenikom, izpostavljanje skupnega faktorja',
+      'Enačbe in neenačbe: enačbe, reševanje enačb, identična in ekvivalentna enačba',
+      'Večkotniki: diagonale in koti večkotnika, pravilni večkotniki, obseg in ploščina večkotnikov',
+      'Odvisnost količin in sorazmerja: koordinate točk, odvisnost in ponazarjanje količin, premo sorazmerje, graf premo sorazmernih količin, obratno sorazmerje, graf obratno sorazmernih količin',
+      'Podatki: obdelava podatkov, aritmetična sredina, povezanost spremenljivk, preiskave',
+      'Krog in krožnica: obseg kroga, ploščina kroga, krožni lok, krožni izsek',
+      'Pitagorov izrek: Pitagorov izrek, dolžine stranic, pravokotnik in kvadrat, enakokraki trikotnik, enakostranični trikotnik, v rombu, v enakokrakem trapezu, v deltoidu, v koordinatnem sistemu',
+      'Kocka in kvader: lastnosti, površina kocke, prostornina kocke, površina kvadra, prostornina kvadra, diagonalni preseki'
+    ],
+    examples: [
+      'Izračunaj: (−5) + (−3).',
+      'Izračunaj: (−8) · (+4).',
+      'Poenostavi izraz: 3x + 5x − 2x.',
+      'Reši enačbo: 3x + 7 = 22.',
+      'Izračunaj kvadratni koren števila 144.',
+      'Krog ima polmer r = 5 cm. Izračunaj obseg in ploščino (π ≈ 3,14).',
+      'Pravokotni trikotnik ima kateti a = 3 cm in b = 4 cm. Izračunaj hipotenuzo.',
+      'Kocka ima rob a = 4 cm. Izračunaj površino in prostornino.',
+      'Kvader ima dimenzije a = 5 cm, b = 3 cm, c = 2 cm. Izračunaj prostornino.',
+      'Preveri, ali je 0,75 enako 3/4.'
+    ]
+  },
+  9: {
+    title: '9. razred OŠ – Matematika 9',
+    source: 'https://eucbeniki.sio.si/mat9',
+    topics: [
+      'Izrazi: množenje veččlenikov, kvadrat dvočlenika, produkt vsote in razlike, razstavljanje, algebrski ulomki',
+      'Enačbe in neenačbe: linearna enačba, ekvivalentno preoblikovanje, enačbe z oklepaji, enačbe z ulomki, enačbe s kvadrati števil, formule, enačbe s parametri, neenačbe, besedilne naloge s števili, o geometriji, o starosti, uporaba enačb',
+      'Geometrijski elementi v prostoru: geometrija v ravnini in prostoru, ravnina in prostor, razdalja v prostoru',
+      'Linearna funkcija: koordinatni sistem, funkcija, premo sorazmerje je funkcija, obratno sorazmerje je funkcija, linearna funkcija, začetna vrednost, smerni koeficient, enačba premice, ničla linearne funkcije, presečišče premic, sistem linearnih enačb',
+      'Obdelava podatkov: podatki in vprašalniki, srednje vrednosti podatkov, škatla z brki, priprava in izvedba ankete',
+      'Razmerje in podobnost: razmerje količin, sorazmerje, premo sorazmerje, obratno sorazmerje, podobnost, podobni trikotniki, načrtovanje podobnih trikotnikov, Talesovi izreki, delitev daljice',
+      'Oglata telesa: prizma, mreža in površina prizme, prostornina prizme, piramida, mreža in površina piramide, prostornina piramide, 4-strana in 3-strana piramida, sestavljena telesa',
+      'Okrogla telesa: valj, mreža in površina valja, prostornina valja, stožec, mreža in površina stožca, prostornina stožca, sestavljena telesa, krogla',
+      'Verjetnost in kombinatorika: poskus, dogodek, izid, računanje verjetnosti'
+    ],
+    examples: [
+      'Izračunaj: (x + 3)(x − 2).',
+      'Razstavi izraz: x² − 9.',
+      'Reši enačbo: 2(x − 3) = 4x + 8.',
+      'Reši enačbo: x/2 + 3 = 7.',
+      'Linearna funkcija: y = 2x + 1. Izračunaj vrednost pri x = 3 in določi ničlo.',
+      'Dani sta premici y = 2x + 1 in y = −x + 4. Poišči presečišče.',
+      'Prizma ima osnovno ploskev pravokotnik s stranicama 4 cm in 3 cm, višina prizme je 5 cm. Izračunaj prostornino.',
+      'Piramida ima kvadratno osnovno ploskev s stranico 4 cm in višino 6 cm. Izračunaj prostornino.',
+      'Valj ima polmer r = 3 cm in višino v = 5 cm. Izračunaj prostornino (π ≈ 3,14).',
+      'Krogla ima polmer r = 4 cm. Izračunaj površino in prostornino (π ≈ 3,14).',
+      'V škatli je 5 rdečih in 7 modrih kroglic. Kolikšna je verjetnost, da potegnemo rdečo?'
+    ]
+  }
 };
 
 function curriculumForGrade(grade) {
@@ -176,7 +271,7 @@ function curriculumForGrade(grade) {
 }
 
 /* ============================================================
-   STROGA PRAVILA GLEDE NA STOPNJO
+   PRAVILA GLEDE NA STOPNJO
    ============================================================ */
 function allowedStepsForLevel(level) {
   if (level <= 1) return 1;
@@ -213,22 +308,14 @@ function validateTopicForLevel(question, level, topicRules) {
    ============================================================ */
 function buildStudentProfile(username, chapterId) {
   const stats = DATA.stats[username] && DATA.stats[username][chapterId];
-  if (!stats || !stats.total) {
-    return 'Ta učenec je prvič v tem poglavju, brez preteklih podatkov.';
-  }
+  if (!stats || !stats.total) return 'Ta učenec je prvič v tem poglavju, brez preteklih podatkov.';
   const pct = Math.round(100 * stats.correct / stats.total);
-  const errorTypes = Object.keys(stats.byType || {})
-    .map(t => {
-      const bt = stats.byType[t];
-      const wrong = bt.total - bt.correct;
-      return wrong > 0 ? `${t}: ${wrong}/${bt.total} napačnih` : null;
-    })
-    .filter(Boolean)
-    .join(', ');
+  const errorTypes = Object.keys(stats.byType || {}).map(t => {
+    const bt = stats.byType[t]; const wrong = bt.total - bt.correct;
+    return wrong > 0 ? `${t}: ${wrong}/${bt.total} napačnih` : null;
+  }).filter(Boolean).join(', ');
   const lastErrors = (stats.errors || []).slice(-3).map(e => e.question).join('; ');
-  return `Učenec je v tem poglavju rešil ${stats.total} nalog, uspešnost ${pct}%.
-Razčlenitev napak po tipih: ${errorTypes || 'ni posebnih napak'}.
-Zadnje 3 napake: ${lastErrors || 'brez'}.`;
+  return `Učenec je v tem poglavju rešil ${stats.total} nalog, uspešnost ${pct}%.\nRazčlenitev napak po tipih: ${errorTypes || 'ni posebnih napak'}.\nZadnje 3 napake: ${lastErrors || 'brez'}.`;
 }
 
 /* ============================================================
@@ -238,45 +325,45 @@ function getTopicRules(topicText) {
   const t = (topicText || '').toLowerCase();
   if ((t.includes('trikot') || t.includes('obseg') || t.includes('ploščin')) && !t.includes('pitagor')) {
     return {
-      1: { forbidden: ['pitagor', 'hipotenuz', '√', 'koren', 'višina iz stranic', 'enakokraki brez višine'], note: 'Samo neposredni izračun obsega s tremi znanimi stranicami ali ploščine z znano osnovnico in višino.' },
-      2: { forbidden: ['pitagor', 'hipotenuz', '√', 'koren'], note: 'Besedilne naloge z obsegom in ploščino, enakokraki trikotnik z znano višino. Brez Pitagorovega izreka.' },
-      3: { forbidden: ['pitagor', 'hipotenuz'], note: 'Kombinirane naloge iz obsega in ploščine. Brez Pitagorovega izreka in brez iskanja višine iz stranic.' }
+      1: { forbidden: ['pitagor', 'hipotenuz', '√', 'koren', 'višina iz stranic'], note: 'Samo neposredni izračun obsega s tremi znanimi stranicami ali ploščine z znano osnovnico in višino.' },
+      2: { forbidden: ['pitagor', 'hipotenuz', '√', 'koren'], note: 'Besedilne naloge z obsegom in ploščino. Brez Pitagorovega izreka.' },
+      3: { forbidden: ['pitagor', 'hipotenuz'], note: 'Kombinirane naloge iz obsega in ploščine. Brez Pitagorovega izreka.' }
     };
   }
   if (t.includes('pitagor')) {
-    return { 1: { forbidden: [], note: 'Prepoznaj pravokotni trikotnik, označi kateti in hipotenuzo.' }, 2: { forbidden: [], note: 'Pitagorov izrek s pitagorejskimi trojicami (3,4,5 / 6,8,10).' }, 3: { forbidden: [], note: 'Pitagorov izrek v besedilni nalogi (lestev, diagonala).' } };
+    return { 1: { forbidden: [], note: 'Prepoznaj pravokotni trikotnik.' }, 2: { forbidden: [], note: 'Pitagorov izrek s trojicami (3,4,5).' }, 3: { forbidden: [], note: 'Pitagorov izrek v besedilni nalogi.' } };
   }
   if (t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak')) {
-    return { 1: { forbidden: ['ulom', 'decimal', 'koren', 'potenc'], note: 'Seštevanje in odštevanje enomestnih celih števil.' }, 2: { forbidden: ['ulom', 'decimal', 'koren', 'potenc'], note: 'Množenje ali deljenje enomestnih celih števil.' }, 3: { forbidden: ['ulom', 'decimal'], note: 'Kombinacija dveh operacij z dvomestnimi celimi števili.' } };
+    return { 1: { forbidden: ['ulom', 'decimal', 'koren', 'potenc'], note: 'Seštevanje in odštevanje enomestnih celih števil.' }, 2: { forbidden: ['ulom', 'decimal'], note: 'Množenje/deljenje enomestnih celih števil.' }, 3: { forbidden: ['ulom', 'decimal'], note: 'Kombinacija dveh operacij z dvomestnimi celimi števili.' } };
   }
   if (t.includes('ulom')) {
-    return { 1: { forbidden: ['decimal', 'negativ'], note: 'Ulomki z enakim imenovalcem, seštevanje.' }, 2: { forbidden: ['decimal'], note: 'Ulomki z enakim imenovalcem, odštevanje in krajšanje.' }, 3: { forbidden: [], note: 'Ulomki z različnimi imenovalci, množenje ali deljenje.' } };
+    return { 1: { forbidden: ['decimal'], note: 'Ulomki z enakim imenovalcem, seštevanje.' }, 2: { forbidden: ['decimal'], note: 'Ulomki z enakim imenovalcem, odštevanje.' }, 3: { forbidden: [], note: 'Ulomki z različnimi imenovalci.' } };
   }
   if (t.includes('decimal')) {
-    return { 1: { forbidden: ['ulom'], note: 'Decimalna števila z eno decimalko, seštevanje.' }, 2: { forbidden: ['ulom'], note: 'Decimalna števila z eno decimalko, odštevanje.' }, 3: { forbidden: ['ulom'], note: 'Decimalna števila z dvema decimalkama, množenje ali deljenje z 10, 100.' } };
+    return { 1: { forbidden: ['ulom'], note: 'Decimalna števila z eno decimalko, seštevanje.' }, 2: { forbidden: ['ulom'], note: 'Decimalna števila z eno decimalko, odštevanje.' }, 3: { forbidden: ['ulom'], note: 'Decimalna števila z dvema decimalkama.' } };
   }
   return null;
 }
 
 function strictLevelRules(grade, topic) {
   const t = (topic || '').toLowerCase();
-  const isCelaStevila = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
+  const isCela = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
   const isUlomki = t.includes('ulom');
-  const isDecimalna = t.includes('decimal');
+  const isDecimal = t.includes('decimal');
   const isPotence = t.includes('potenc') || t.includes('koren');
   const isOdstotki = t.includes('odstot');
   const isEnacbe = t.includes('enačb') || t.includes('enacb');
   const isPitagora = t.includes('pitagor');
-  const isGeometrija = t.includes('geometr') || isPitagora || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat') || t.includes('obseg') || t.includes('ploščin') || t.includes('prostornin');
+  const isGeometrija = t.includes('geometr') || isPitagora || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat') || t.includes('obseg') || t.includes('ploščin');
 
-  if (isPitagora) return { 1: 'prepoznaj pravokotni trikotnik in označi kateti ter hipotenuzo.', 2: 'Pitagorov izrek z enostavnimi pitagorejskimi trojicami (3,4,5 / 6,8,10).', 3: 'Pitagorov izrek v besedilni nalogi (npr. lestev, diagonala).' };
-  if (isCelaStevila) return { 1: 'seštevanje in odštevanje ENOMESTNIH celih števil (npr. 3 + (−4), −2 + 5).', 2: 'množenje ali deljenje enomestnih celih števil.', 3: 'kombinacija dveh operacij z dvomestnimi celimi števili.' };
-  if (isUlomki) return { 1: 'ulomki z ENAKIM imenovalcem, seštevanje.', 2: 'ulomki z ENAKIM imenovalcem, odštevanje in krajšanje.', 3: 'ulomki z RAZLIČNIMI imenovalci.' };
-  if (isDecimalna) return { 1: 'decimalna števila z ENO decimalko, seštevanje.', 2: 'decimalna števila z ENO decimalko, odštevanje.', 3: 'decimalna števila z DVEMA decimalkama, množenje ali deljenje z 10, 100.' };
-  if (isPotence) return { 1: 'kvadrat ENOMESTNEGA števila.', 2: 'kvadrat DVOMESTNEGA števila ali kub enomestnega.', 3: 'kvadratni koren popolnega kvadrata ali potenca z negativnim eksponentom.' };
-  if (isOdstotki) return { 1: '10 % od okroglega števila.', 2: '1 % in 10 % od števila.', 3: 'poljuben odstotek od števila ali odstotek, če poznamo delež.' };
-  if (isEnacbe) return { 1: 'enačba z ENO operacijo (npr. x + 3 = 7).', 2: 'enačba z DVEMA operacijama (npr. 2x = 8) ali neznanka na obeh straneh.', 3: 'enačba z oklepaji ali besedilna naloga, ki vodi v enačbo.' };
-  if (isGeometrija) return { 1: 'obseg pravokotnika ali ploščina kvadrata z neposredno znanimi podatki.', 2: 'obseg/ploščina trikotnika s tremi znanimi stranicami ali znano osnovnico in višino.', 3: 'kombinirana geometrijska naloga BREZ Pitagorovega izreka.' };
+  if (isPitagora) return { 1: 'prepoznaj pravokotni trikotnik.', 2: 'Pitagorov izrek s trojicami.', 3: 'Pitagorov izrek v besedilni nalogi.' };
+  if (isCela) return { 1: 'seštevanje in odštevanje enomestnih celih števil.', 2: 'množenje/deljenje enomestnih celih števil.', 3: 'kombinacija dveh operacij z dvomestnimi celimi števili.' };
+  if (isUlomki) return { 1: 'ulomki z enakim imenovalcem, seštevanje.', 2: 'ulomki z enakim imenovalcem, odštevanje.', 3: 'ulomki z različnimi imenovalci.' };
+  if (isDecimal) return { 1: 'decimalna števila z eno decimalko, seštevanje.', 2: 'decimalna števila z eno decimalko, odštevanje.', 3: 'decimalna števila z dvema decimalkama.' };
+  if (isPotence) return { 1: 'kvadrat enomestnega števila.', 2: 'kvadrat dvomestnega števila.', 3: 'kvadratni koren popolnega kvadrata.' };
+  if (isOdstotki) return { 1: '10 % od okroglega števila.', 2: '1 % in 10 % od števila.', 3: 'poljuben odstotek.' };
+  if (isEnacbe) return { 1: 'enačba z eno operacijo.', 2: 'enačba z dvema operacijama.', 3: 'enačba z oklepaji.' };
+  if (isGeometrija) return { 1: 'obseg pravokotnika ali ploščina kvadrata.', 2: 'obseg/ploščina trikotnika s tremi znanimi stranicami.', 3: 'kombinirana geometrijska naloga brez Pitagorovega izreka.' };
   return { 1: 'enomestna števila, ena operacija.', 2: 'dvomestna števila, ena operacija.', 3: 'dvomestna števila, dve operaciji.' };
 }
 
@@ -285,11 +372,11 @@ function taskTypeAllowed(question, topic) {
   const q = (question || '').toLowerCase();
   const allowsFractions = t.includes('ulom');
   const allowsDecimal = t.includes('decimal') || t.includes('odstot') || t.includes('koren') || t.includes('potenc');
-  const isCelaStevila = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
+  const isCela = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
   if (!allowsFractions && /\\frac/.test(q)) return false;
   if (!allowsDecimal && /[0-9],[0-9]|[0-9]\.[0-9]/.test(q)) return false;
   if (!t.includes('potenc') && !t.includes('koren') && /\^/.test(q)) { if (!allowsDecimal) return false; }
-  if (isCelaStevila && /\\frac/.test(q)) return false;
+  if (isCela && /\\frac/.test(q)) return false;
   return true;
 }
 
@@ -343,7 +430,6 @@ async function connectDB() {
     await mongoClient.connect();
     db = mongoClient.db('matematicni-tutor');
     console.log('✅ Povezan na MongoDB Atlas.');
-
     const usersDocs = await db.collection('users').find({}).toArray();
     usersDocs.forEach(d => { DATA.users[d._id] = d.value; });
     const chapterDocs = await db.collection('chapters').find({}).toArray();
@@ -356,16 +442,12 @@ async function connectDB() {
     sessionsDocs.forEach(d => { DATA.sessions[d._id] = d.value; });
     const recentDocs = await db.collection('recentTasks').find({}).toArray();
     recentDocs.forEach(d => { DATA.recentTasks[d._id] = d.value; });
-
     if (!DATA.users['ucitelj']) {
       DATA.users['ucitelj'] = { firstName: 'Učitelj', lastName: '', grade: null, password: 'ucitelj123', role: 'admin' };
       await saveData();
       console.log('✅ Ustvarjen učiteljski račun.');
     }
-  } catch (err) {
-    console.error('❌ Napaka pri povezavi na MongoDB:', err.message);
-    process.exit(1);
-  }
+  } catch (err) { console.error('❌ Napaka pri povezavi na MongoDB:', err.message); process.exit(1); }
 }
 
 async function saveData() {
@@ -426,36 +508,6 @@ async function callAI(messages, maxAttempts = 6) {
     }
   }
   throw lastErr;
-}
-
-/* ============================================================
-   RAG: ISKANJE PO UČBENIKU
-   ============================================================ */
-async function getGroqEmbedding(text) {
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/embeddings', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text-v1_5', input: String(text).slice(0, 8000) })
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.data[0].embedding;
-  } catch (e) { return null; }
-}
-
-async function searchUcbenik(grade, queryText, limit = 3) {
-  if (!db) return [];
-  try {
-    const queryEmbedding = await getGroqEmbedding(queryText);
-    if (!queryEmbedding) return [];
-    const coll = db.collection('ucbenik_chunks');
-    const results = await coll.aggregate([
-      { $vectorSearch: { index: 'ucbenik_vector_idx', path: 'embedding', queryVector: queryEmbedding, numCandidates: limit * 20, limit: limit, filter: { grade: grade } } },
-      { $project: { text: 1, sourceUrl: 1, score: { $meta: 'vectorSearchScore' } } }
-    ]).toArray();
-    return results;
-  } catch (e) { console.warn('RAG iskanje ni uspelo:', e.message); return []; }
 }
 
 /* ============================================================
@@ -647,7 +699,7 @@ app.post('/api/start-session', (req, res) => {
 });
 
 /* ============================================================
-   API: GENERIRANJE (z RAG)
+   API: GENERIRANJE (brez RAG, a z učnim načrtom + primeri)
    ============================================================ */
 app.post('/api/generate-task', async (req, res) => {
   const { username, chapterId, isRetry } = req.body || {};
@@ -686,26 +738,13 @@ app.post('/api/generate-task', async (req, res) => {
 
   const studentProfile = buildStudentProfile(username, chapterId);
 
-  // === RAG: poišči relevantne dele učbenika ===
-  const ragQuery = topicText + ' ' + levelDesc + ' ' + (ch.llmPrompt || '');
-  const ragResults = await searchUcbenik(grade, ragQuery, 3);
-  let ragContext = '';
-  if (ragResults.length > 0) {
-    ragContext = '\n\n📚 REFERENČNA VSEBINA IZ UČBENIKA (uporabi kot vzor za slog in vsebino, vendar z drugačnimi številkami):\n';
-    ragResults.forEach((r, i) => {
-      ragContext += `\n--- Primer ${i + 1} (${r.sourceUrl}) ---\n${r.text.slice(0, 800)}\n`;
-    });
-    ragContext += '\nNaloga naj bo v skladu s temi primeri.\n';
-  }
+  const curriculum = curriculumForGrade(grade);
+  const curriculumText = curriculum.topics.map((t, i) => `  ${i + 1}. ${t}`).join('\n');
+  const examplesText = curriculum.examples.map((e, i) => `  ${i + 1}. ${e}`).join('\n');
 
   let sketchInstruction = '';
   if (isGeometry) {
-    sketchInstruction = `
-⚠️ SKICA (JSON objekt v polju "sketch"):
-- Možni tipi: right_triangle, triangle, rectangle, square, circle, angle.
-- Če skica ni smiselna, vrni "sketch": null.
-- STROGO: Podatki so lahko SAMO na enem mestu (besedilo ALI skica).
-- Trikotnik: če so vse stranice enake, besedilo MORA navesti "enakostranični trikotnik".`;
+    sketchInstruction = `\n⚠️ SKICA (JSON objekt v polju "sketch"):\n- Možni tipi: right_triangle, triangle, rectangle, square, circle, angle.\n- Če skica ni smiselna, vrni "sketch": null.\n- STROGO: Podatki so lahko SAMO na enem mestu (besedilo ALI skica).\n- Trikotnik: če so vse stranice enake, besedilo MORA navesti "enakostranični trikotnik".`;
   } else {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
   }
@@ -715,10 +754,13 @@ app.post('/api/generate-task', async (req, res) => {
 RAZRED: ${grade}
 TEMA: "${topicText}"
 
-📖 UČNI NAČRT ZA ${grade}. RAZRED:
-${curriculumForGrade(grade)}
+📖 UČNI NAČRT ZA ${curriculum.title}:
+${curriculumText}
 
-Naloga MORA biti izključno iz tega učnega načrta. Ne uporabljaj konceptov, ki niso navedeni zgoraj.`;
+📝 PRIMERI NALOG IZ TEGA UČNEGA NAČRTA (za vzor, ne kopiraj):
+${examplesText}
+
+Naloga MORA biti izključno iz zgoraj navedenega učnega načrta in v slogu primerov. NE uporabljaj konceptov, ki niso navedeni zgoraj.`;
 
   if (topicRules && topicRules[level] && topicRules[level].forbidden && topicRules[level].forbidden.length) {
     systemMessage += `\n\n🚫 PREPOVEDANO NA STOPNJI ${level}: ${topicRules[level].forbidden.join(', ')}\nNamig: ${topicRules[level].note || ''}`;
@@ -730,7 +772,6 @@ Naloga MORA biti izključno iz tega učnega načrta. Ne uporabljaj konceptov, ki
   if (internalPrompt) systemMessage += `\n\n⚠️ UKAZ UČITELJA:\n${internalPrompt}`;
 
   systemMessage += `\n\n📊 PROFIL UČENCA:\n${studentProfile}`;
-  systemMessage += ragContext;
 
   let prompt = `Tema: "${topicText}"
 Razred: ${grade}
@@ -1025,6 +1066,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`✅ Strežnik: http://localhost:${PORT}`);
   console.log(`   🤖 AI: Groq (${GROQ_MODEL})`);
-  console.log(`   📚 RAG: MongoDB Atlas Vector Search (ucbenik_chunks)`);
 });
 connectDB().then(() => { console.log('✅ Baza pripravljena.'); }).catch(err => { console.error('❌ Baza ni uspela:', err.message); });
