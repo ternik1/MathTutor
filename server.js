@@ -29,17 +29,13 @@ if (!process.env.MONGODB_URI) {
    ============================================================ */
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Odstrani podvojene backslashe in \text{...} ter podobne okraske
-function sanitizeLatex(s) {
+function normalizeLatex(s) {
   if (!s) return s;
   let t = String(s);
-  // Podvojeni backslashi -> enojni
   t = t.replace(/\\\\/g, '\\');
-  // Odstrani \text{...}, \mathrm{...}, \mbox{...} (z vsebino vred)
   t = t.replace(/\\text\{([^{}]*)\}/g, '$1');
   t = t.replace(/\\mathrm\{([^{}]*)\}/g, '$1');
   t = t.replace(/\\mbox\{([^{}]*)\}/g, '$1');
-  // Odstrani \text brez oklepajev (redko)
   t = t.replace(/\\text/g, '');
   return t;
 }
@@ -220,11 +216,11 @@ async function saveData() {
 }
 
 /* ============================================================
-   UČNI NAČRT – KLJUČNE TEME PO RAZREDIH (6.–9.)
+   UČNI NAČRT – KLJUČNE TEME PO RAZREDIH
    ============================================================ */
 const CURRICULUM = {
   6: [
-    'naravna števila in število 0, decimalna števila',
+    'naravna števila in decimalna števila',
     'seštevanje, odštevanje, množenje in deljenje decimalnih števil',
     'ulomki (enaki imenovalci, krajšanje, razširjanje)',
     'obseg in ploščina pravokotnika in kvadrata',
@@ -370,14 +366,13 @@ function levelDescriptionsForGrade(grade) {
   return { 1: arr[0], 2: arr[1], 3: arr[2], 4: arr[3], 5: arr[4] };
 }
 
-// Preveri, ali naloga vsebuje snow iz višjega razreda, kot je dovoljeno
-function usesHigherGradeTopic(question, grade) {
+// Preveri, ali naloga vsebuje Pitagorov izrek, ko ta ni tema
+function usesPitagora(question, topic) {
+  const t = (topic || '').toLowerCase();
   const q = (question || '').toLowerCase();
-  const hasPitagora = q.includes('pitagor') || /hipotenuz/.test(q) || /katet/.test(q);
-  if (hasPitagora && grade < 8) return true;
-  const hasPotence = /\^/.test(q) || /\\sqrt/.test(q) || q.includes('koren') || q.includes('potenc');
-  if (hasPotence && grade < 8) return true;
-  return false;
+  const topicHasPitagora = t.includes('pitagor');
+  const questionHasPitagora = q.includes('pitagor') || /hipotenuz/.test(q) || /katet/.test(q);
+  return questionHasPitagora && !topicHasPitagora;
 }
 
 function taskTypeAllowed(question, topic) {
@@ -429,16 +424,16 @@ async function waitIfQuotaLow() {
   }
 }
 
-async function callAI(prompt, maxAttempts = 6) {
+async function callAI(messages, maxAttempts = 6) {
   let lastErr;
   for (let a = 1; a <= maxAttempts; a++) {
     await waitIfQuotaLow();
     try {
       const r = await groqClient.chat.completions.create({
         model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
+        messages: messages,
         response_format: { type: 'json_object' },
-        temperature: 0.8,
+        temperature: 0.7,
         max_tokens: 1200
       });
       if (r && r._response && r._response.headers) updateQuotaFromHeaders(r._response.headers);
@@ -789,80 +784,69 @@ app.post('/api/generate-task', async (req, res) => {
   let sketchInstruction = '';
   if (isGeometry) {
     sketchInstruction = `
-⚠️ SKICA (za to temo je skica SMISELNA):
-- Naloga naj bo takšna, da jo je mogoče narisati.
+⚠️ SKICA:
 - V polje "sketch" vrni JSON objekt z opisom skice. Možni tipi:
-  * {"type":"right_triangle","data":{"a":8,"b":15,"unit":"cm"}} – pravokotni trikotnik s katetama a in b.
-  * {"type":"triangle","data":{"a":5,"b":6,"c":7,"unit":"cm"}} – trikotnik s tremi stranicami.
-  * {"type":"rectangle","data":{"a":5,"b":3,"unit":"cm"}} – pravokotnik.
-  * {"type":"square","data":{"a":4,"unit":"cm"}} – kvadrat.
-  * {"type":"circle","data":{"r":5,"unit":"cm"}} – krožnica s polmerom r.
-  * {"type":"angle","data":{"alpha":45,"beta":60,"unit":"°"}} – kot.
-- Če skica ni smiselna za to nalogo, vrni "sketch": null.
+  * {"type":"right_triangle","data":{"a":8,"b":15,"unit":"cm"}}
+  * {"type":"triangle","data":{"a":5,"b":6,"c":7,"unit":"cm"}}
+  * {"type":"rectangle","data":{"a":5,"b":3,"unit":"cm"}}
+  * {"type":"square","data":{"a":4,"unit":"cm"}}
+  * {"type":"circle","data":{"r":5,"unit":"cm"}}
+  * {"type":"angle","data":{"alpha":45,"beta":60,"unit":"°"}}
+- Če skica ni smiselna, vrni "sketch": null.
 `;
   } else {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
   }
 
-  let prompt = `Si matematični tutor za učence ${grade}. razreda OŠ v Sloveniji.
+  // Sistemsko sporočilo – stroga navodila
+  const systemMessage = `Si matematični tutor za slovenske osnovnošolce. Tvoja edina naloga je generiranje matematične naloge iz TOČNO DOLOČENE TEME in RAZREDA.
 
-⚠️⚠️⚠️ NAJPOMEMBNEJŠE PRAVILO – UČNI NAČRT ⚠️⚠️⚠️
-Naloga MORA biti izključno iz snovi ${grade}. razreda po slovenskem učnem načrtu za matematiko.
+⚠️⚠️⚠️ NAJPOMEMBNEJŠE PRAVILO ⚠️⚠️⚠️
+Naloga MORA biti izključno iz teme "${ch.topic || ch.title}" in iz snovi ${grade}. razreda.
 
-Teme, ki SO dovoljene za ${grade}. razred:
+Prepovedano je uporabljati katerokoli drugo matematično orodje ali snow, ki ni del teme. Če je tema "obseg in ploščina trikotnika", NE uporabljaj Pitagorovega izreka, tudi če bi z njim lažje rešil nalogo. Naloga mora biti rešljiva SAMO z znanjem, ki je del teme.
+
+Teme, ki so dovoljene za ${grade}. razred:
 ${curriculumForGrade}
 
-Prepovedano je uporabljati snow iz VIŠJIH razredov. Konkretno:
-${grade < 8 ? '- V 6. in 7. razredu NE uporabljaj Pitagorovega izreka, potenc, korenov, linearnih enačb z neznanko na obeh straneh.' : ''}
-${grade < 9 ? '- V 6., 7. in 8. razredu NE uporabljaj kvadratne enačbe, trigonometrije, linearnih funkcij.' : ''}
-- Če je za rešitev naloge potreben Pitagorov izrek, mora biti razred vsaj 8.
-- Če je za rešitev potrebna kvadratna enačba ali trigonometrija, mora biti razred 9.
+Posebej prepovedano:
+${grade < 8 ? '- Pitagorov izrek, potence, koreni, kvadratna enačba, trigonometrija.' : ''}
+${grade === 8 ? '- Kvadratna enačba, trigonometrija, linearne funkcije.' : ''}
 
-⚠️ PRIMER ZA 7. RAZRED (obseg in ploščina trikotnika):
-- Dovoljeno: podane so vse tri stranice in višina na eno od stranic.
-- Prepovedano: podani sta le dve stranici, tretjo pa bi bilo treba izračunati s Pitagorovim izrekom (to je snow 8. razreda).
+Naloga naj se zgleduje po nalogah iz slovenskih i-učbenikov (eucbeniki.sio.si) in delovnih listov. Lahko je identična po strukturi, le števila naj bodo drugačna.
 
-Tema sklopa: "${ch.topic || ch.title}".
-Kategorija: ${ch.category === 'domaca' ? 'domača naloga' : 'utrjevanje'}.
-Raven: ${level}/5 – ${levelDesc}.
+Vrni izključno JSON.`;
 
-⚠️ VEČ ODGOVOROV:
-- Če naloga zahteva več različnih izračunov (npr. "izračunaj obseg IN ploščino"), vrni v polju "answers" SEZNAM objektov, vsakega z "label", "value" in "latex".
-- Primer: [{"label":"Obseg","value":16,"latex":"16\\text{ cm}"},{"label":"Ploščina","value":15,"latex":"15\\text{ cm}^2"}]
-- Če naloga zahteva le en odgovor, vrni seznam z enim elementom.
-- V "latex" poljih NE uporabljaj \\text{...}. Enote piši brez \\text, npr. "16 cm" ali "16\\,cm".
-- Polji "answer" in "answer_latex" (za združljivost) naj vsebujeta PRVI odgovor iz seznama.
+  let prompt = `Tema: "${ch.topic || ch.title}"
+Razred: ${grade}
+Raven: ${level}/5 – ${levelDesc}
+Kategorija: ${ch.category === 'domaca' ? 'domača naloga' : 'utrjevanje'}
 
 ${sketchInstruction}
 
-⚠️ STROGO PRAVILO O TIPU NALOGE:
-- Tip naloge mora ustrezati temi "${ch.topic || ch.title}".
-- Če tema vsebuje "cela števila", NE uporabi ulomkov ali decimalnih števil.
-- Če tema vsebuje "ulomke", uporabi ulomke.
-- Če tema vsebuje "decimalna števila", uporabi decimalna števila.
-- Ne mešaj tipov nalog, ki ne sodijo v temo.
+⚠️ VEČ ODGOVOROV:
+- Če naloga zahteva več izračunov, vrni "answers" kot seznam objektov z "label", "value" in "latex".
+- Če je en odgovor, vrni seznam z enim elementom.
+- V "latex" poljih NE uporabljaj \\text{...}.
 
 ⚠️ RAZNOLIKOST:
-- Naloga mora biti RAZLIČNA od vseh spodaj naštetih prejšnjih nalog.
-- Prepovedano je uporabiti ISTA ŠTEVILA kot v katerikoli prejšnji nalogi.
+- Naloga mora biti različna od spodnjih prejšnjih nalog.
+- Prepovedano je uporabiti ista števila.
 
-PREJŠNJE NALOGE (izogibaj se jim):
+PREJŠNJE NALOGE:
 ${recentList || '(še ni bilo nalog)'}
 
-ŠTEVILA, KI SO BILA ŽE UPORABLJENA (ne uporabi jih znova):
+ŠTEVILA, KI SO BILA ŽE UPORABLJENA:
 ${recentNumsList}
 
-PRAVILA ZA NALOGO:
-- Generiraj NATANKO ENO nalogo.
-- Uporabi LaTeX za matematične izraze: ulomki kot \\frac{a}{b}, potence kot x^{2}, koreni kot \\sqrt{x}.
-- NE uporabljaj \\text{...} v LaTeX poljih. Namesto "\\text{ cm}" piši " cm".
-- V poljih "answer_latex" in "latex" uporabi ENAK zapis kot v besedilu naloge (en backslash pred \\frac).
-- Naloga naj bo v slovenščini, primerna ${grade}. razredu.
-- Vsi odgovori v "answers" naj bodo enolično določljivi in zapisani kot ŠTEVILA.
+PRAVILA:
+- Generiraj natanko eno nalogo.
+- Uporabi LaTeX za matematične izraze.
+- Odgovor naj bo število.
 
-Vrni izključno JSON:
+Vrni JSON:
 {
-  "question": "kratek prikaz naloge v LaTeX/tekstu",
+  "question": "besedilo naloge",
   "answers": [{"label":"Odgovor","value":0.75,"latex":"\\\\frac{3}{4}"}],
   "answer": 0.75,
   "answer_latex": "\\\\frac{3}{4}",
@@ -870,13 +854,17 @@ Vrni izključno JSON:
 }`;
 
   if (isRetry && sess.currentTask) {
-    prompt += `\n\nUčenec je prejšnjo nalogo rešil NAPAČNO. Generiraj PODOBNO nalogo ISTE ravni (${level}/5), a z DRUGAČNIMI ŠTEVILI kot v prejšnji nalogi.`;
+    prompt += `\n\nUčenec je prejšnjo nalogo rešil NAPAČNO. Generiraj podobno nalogo iste ravni z drugačnimi števili.`;
   }
 
   try {
     let finalData = null;
     for (let attempt = 1; attempt <= 5; attempt++) {
-      const response = await callAI(prompt);
+      const messages = [
+        { role: 'system', content: systemMessage },
+        { role: 'user', content: prompt }
+      ];
+      const response = await callAI(messages);
       const data = JSON.parse(response.choices[0].message.content);
       if (typeof data.question !== 'string' || data.answer === undefined) {
         prompt += `\n\nOPOZORILO: Neveljavna struktura. Vrni veljaven JSON.`;
@@ -888,66 +876,70 @@ Vrni izključno JSON:
         answersArr = data.answers.map(a => ({
           label: String(a.label || 'Odgovor'),
           value: typeof a.value === 'number' ? a.value : parseNumberString(a.value),
-          latex: sanitizeLatex(a.latex || String(a.value))
+          latex: normalizeLatex(a.latex || String(a.value))
         })).filter(a => !isNaN(a.value));
       }
       if (!answersArr.length) {
         const ansNum = typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer);
         if (isNaN(ansNum)) {
-          prompt += `\n\nOPOZORILO: Odgovor ni število. Vrni številski odgovor.`;
+          prompt += `\n\nOPOZORILO: Odgovor ni število.`;
           continue;
         }
         answersArr = [{
           label: 'Odgovor',
           value: ansNum,
-          latex: sanitizeLatex(data.answer_latex || String(data.answer))
+          latex: normalizeLatex(data.answer_latex || String(data.answer))
         }];
       }
 
-      const questionSanitized = sanitizeLatex(data.question);
-      const candidate = {
+      const questionSanitized = normalizeLatex(data.question);
+
+      // Preveri Pitagorov izrek, ko ta ni tema
+      if (usesPitagora(questionSanitized, ch.topic || ch.title)) {
+        prompt += `\n\nOPOZORILO: Naloga vsebuje Pitagorov izrek, ki NI del teme "${ch.topic || ch.title}". Generiraj nalogo, ki je rešljiva SAMO z znanjem te teme, brez Pitagorovega izreka.`;
+        continue;
+      }
+
+      if (!taskTypeAllowed(questionSanitized, ch.topic || ch.title)) {
+        prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip.`;
+        continue;
+      }
+      if (isTooSimilar({ question: questionSanitized }, recent.slice(-10))) {
+        prompt += `\n\nOPOZORILO: Prejšnji poskus je bil preveč podoben. Uporabi drugačna števila.`;
+        continue;
+      }
+
+      finalData = {
         question: questionSanitized,
         answer: answersArr[0].value,
         answerRaw: answersArr[0].latex,
         answers: answersArr,
         sketch: data.sketch || null
       };
-
-      // Preveri snow iz višjega razreda
-      if (usesHigherGradeTopic(questionSanitized, grade)) {
-        prompt += `\n\nOPOZORILO: Naloga vsebuje snow iz VIŠJEGA razreda (npr. Pitagorov izrek pri ${grade}. razredu). Generiraj nalogo, ki ustreza SAMO snovi ${grade}. razreda.`;
-        continue;
-      }
-
-      if (!taskTypeAllowed(candidate.question, ch.topic || ch.title)) {
-        prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip. Uporabi SAMO tip, ki ustreza temi "${ch.topic || ch.title}".`;
-        continue;
-      }
-      if (isTooSimilar(candidate, recent.slice(-10))) {
-        prompt += `\n\nOPOZORILO: Prejšnji poskus je bil preveč podoben že rešeni nalogi. Uporabi POPOLNOMA DRUGAČNA števila.`;
-        continue;
-      }
-      finalData = candidate;
       break;
     }
 
     if (!finalData) {
-      const response = await callAI(prompt);
+      const messages = [
+        { role: 'system', content: systemMessage },
+        { role: 'user', content: prompt }
+      ];
+      const response = await callAI(messages);
       const data = JSON.parse(response.choices[0].message.content);
       let answersArr = Array.isArray(data.answers) && data.answers.length
         ? data.answers.map(a => ({
             label: String(a.label || 'Odgovor'),
             value: typeof a.value === 'number' ? a.value : parseNumberString(a.value),
-            latex: sanitizeLatex(a.latex || String(a.value))
+            latex: normalizeLatex(a.latex || String(a.value))
           })).filter(a => !isNaN(a.value))
         : [{
             label: 'Odgovor',
             value: typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer),
-            latex: sanitizeLatex(data.answer_latex || String(data.answer))
+            latex: normalizeLatex(data.answer_latex || String(data.answer))
           }];
       if (!answersArr.length) answersArr = [{ label: 'Odgovor', value: 0, latex: '0' }];
       finalData = {
-        question: sanitizeLatex(data.question),
+        question: normalizeLatex(data.question),
         answer: answersArr[0].value,
         answerRaw: answersArr[0].latex,
         answers: answersArr,
@@ -1037,9 +1029,9 @@ PODVPRAŠANJE: "${exp.label}"
 PRAVILEN ODGOVOR: ${exp.value} (zapis: ${exp.latex})
 UČENČEV ODGOVOR: "${rawUser}"
 
-Ugotovi, ali je učenčev odgovor pravilen (vključno z enakovrednimi zapisi, npr. "pol", "ena polovica", "1/2", "0.5").
+Ugotovi, ali je učenčev odgovor pravilen (vključno z enakovrednimi zapisi).
 Vrni JSON: { "is_correct": true/false }`;
-        const response = await callAI(prompt);
+        const response = await callAI([{ role: 'user', content: prompt }]);
         const aiEval = JSON.parse(response.choices[0].message.content);
         ok = !!aiEval.is_correct;
       } catch (e) {
@@ -1109,17 +1101,17 @@ PRAVILNI ODGOVORI: ${correctText}
 UČENČEVI ODGOVORI: ${Array.isArray(userAnswers) ? userAnswers.map((a, i) => (expected[i] ? expected[i].label + '=' + a : a)).join('; ') : userAnswers}
 
 RAZLAGA MORA BITI:
-- Napisana v ZELO PREPROSTEM SLOVENSKEM JEZIKU, primernem ${ch.grade}. razredu OŠ.
+- V ZELO PREPROSTEM SLOVENSKEM JEZIKU, primernem ${ch.grade}. razredu OŠ.
 - Kratka: največ 3 alineje, vsaka največ 1–2 kratka stavka.
 - Brez težkih besed, brez teorije, brez uvodov.
-- Uporabi LaTeX za matematične izraze (en backslash pred \\frac).
-- NE uporabljaj \\text{...}. Enote piši brez \\text.
-- Zadnja alineja naj bo pravilen rezultat v obliki: "Rezultat: <latex>".
+- Uporabi LaTeX za matematične izraze.
+- NE uporabljaj \\text{...}.
+- Zadnja alineja: "Rezultat: <latex>".
 
 Vrni JSON: { "steps": ["korak 1", "korak 2", "Rezultat: ..."] }`;
-      const response = await callAI(prompt);
+      const response = await callAI([{ role: 'user', content: prompt }]);
       const data = JSON.parse(response.choices[0].message.content);
-      steps = Array.isArray(data.steps) ? data.steps.map(sanitizeLatex) : [];
+      steps = Array.isArray(data.steps) ? data.steps.map(normalizeLatex) : [];
     } catch (e) {
       steps = expected.map(e => 'Rezultat: ' + e.latex);
     }
@@ -1246,7 +1238,7 @@ Aktivnih: ${perStudent.length}
 Napake: ${JSON.stringify(topClassErrors.map(e => ({ q: e.question, n: e.count })))}
 Po tipu: ${JSON.stringify(classByType)}
 Napiši 4–6 stavkov. JSON: {"text":"..."}`;
-    const response = await callAI(prompt);
+    const response = await callAI([{ role: 'user', content: prompt }]);
     const data = JSON.parse(response.choices[0].message.content);
     textAnalysis = data.text || null;
   } catch (e) { console.warn('Analiza ni uspela:', e.message); }
