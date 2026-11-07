@@ -364,7 +364,7 @@
     <div id="teacherChapters" class="hidden">
       <h3>Dodaj sklop</h3>
       <input id="newChapterTitle" placeholder="Naslov sklopa">
-      <input id="newChapterDesc" placeholder="Kratek opis (neobvezno)">
+      <textarea id="newChapterInstructions" placeholder="Kakšne naloge naj Groq sestavlja? (npr. 'Naloge iz obsega in ploščine trikotnika. Podane so vse tri stranice in višina. Brez Pitagorovega izreka.'"></textarea>
       <select id="newChapterType" onchange="toggleTopicField()">
         <option value="llm">LLM tutor (poljubna tema prek Groq)</option>
         <option value="cela_stevila">Cela števila (vgrajen generator)</option>
@@ -410,7 +410,7 @@
     </div>
     <div class="settings-box">
       <input id="editTitle" placeholder="Naslov">
-      <input id="editDesc" placeholder="Opis">
+      <textarea id="editInstructions" placeholder="Kakšne naloge naj Groq sestavlja?"></textarea>
       <select id="editType">
         <option value="llm">LLM tutor</option>
         <option value="cela_stevila">Cela števila</option>
@@ -562,7 +562,7 @@ async function renderMath(el) {
 }
 
 /* ============================================================
-   JSXGRAPH – risanje skic (omejeno na 360x260 px)
+   JSXGRAPH
    ============================================================ */
 function clearSketch() {
   document.getElementById('sketchContainer').classList.add('hidden');
@@ -582,14 +582,10 @@ function renderSketch(sketch) {
   var box = document.getElementById('jxgbox');
   box.innerHTML = '';
 
-  // Velikost risalne plošče – fiksna, manjša
-  var W = 360, H = 260;
-
   try {
     var type = sketch.type;
     var d = sketch.data || {};
 
-    // Skupne nastavitve
     var common = {
       axis: false,
       showNavigation: false,
@@ -770,7 +766,7 @@ function renderStudentChapterList() {
     var locked = ch.category === 'domaca' && ch.deadline && Date.now() > new Date(ch.deadline).getTime();
     var div = document.createElement('div');
     div.className = 'chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje ' : '') + (locked ? 'locked' : '');
-    var html = '<div class="chapter-left"><div class="chapter-title">' + ch.title + '</div><div class="chapter-desc">' + (ch.desc || '') + '</div>';
+    var html = '<div class="chapter-left"><div class="chapter-title">' + ch.title + '</div><div class="chapter-desc">' + (ch.instructions || '') + '</div>';
     if (ch.deadline) html += '<div class="chapter-deadline">⏰ Rok: ' + new Date(ch.deadline).toLocaleString('sl-SI') + (locked ? ' (POTEKEL)' : '') + '</div>';
     html += '</div>';
     div.innerHTML = html;
@@ -793,7 +789,7 @@ function openChapter(ch) {
   document.getElementById('studentChaptersView').classList.add('hidden');
   document.getElementById('tutorView').classList.remove('hidden');
   document.getElementById('tutorTitle').textContent = ch.title;
-  document.getElementById('tutorDesc').textContent = ch.desc || '';
+  document.getElementById('tutorDesc').textContent = ch.instructions || '';
   document.getElementById('explanationBox').innerHTML = '';
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
@@ -1209,7 +1205,7 @@ function renderTeacherChapterList() {
         '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
         (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span>' +
         (locked ? '<span class="badge" style="background:#e74c3c;">ZAKLENJENO</span>' : '') +
-        '</div><div class="chapter-desc">' + (ch.desc || '') + '</div>';
+        '</div><div class="chapter-desc">' + (ch.instructions || '') + '</div>';
       if (ch.deadline) html += '<div class="chapter-deadline">⏰ ' + new Date(ch.deadline).toLocaleString('sl-SI') + '</div>';
       html += '</div>' +
         '<div class="chapter-actions">' +
@@ -1232,7 +1228,7 @@ function quickDeleteChapter(id, title) {
 
 function addChapter() {
   var title = document.getElementById('newChapterTitle').value.trim();
-  var desc = document.getElementById('newChapterDesc').value.trim();
+  var instructions = document.getElementById('newChapterInstructions').value.trim();
   var type = document.getElementById('newChapterType').value;
   var grade = document.getElementById('newChapterGrade').value;
   var category = document.getElementById('newChapterCategory').value;
@@ -1245,13 +1241,13 @@ function addChapter() {
   if (category === 'domaca' && !deadline) { err.textContent = 'Za domačo določi rok.'; return; }
   fetch('/api/chapters', {
     method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-    body: JSON.stringify({ title, desc, type, grade, category, deadline, topic })
+    body: JSON.stringify({ title, instructions, type, grade, category, deadline, topic })
   })
     .then(r => r.json())
     .then(data => {
       if (data.error) { err.textContent = data.error; return; }
       document.getElementById('newChapterTitle').value = '';
-      document.getElementById('newChapterDesc').value = '';
+      document.getElementById('newChapterInstructions').value = '';
       document.getElementById('newChapterTopic').value = '';
       document.getElementById('newChapterDeadline').value = '';
       loadTeacherChapters();
@@ -1268,7 +1264,7 @@ function openChapterSettings(id) {
   document.getElementById('chapterSettingsView').classList.remove('hidden');
   document.getElementById('settingsSubtitle').textContent = ch.title;
   document.getElementById('editTitle').value = ch.title;
-  document.getElementById('editDesc').value = ch.desc || '';
+  document.getElementById('editInstructions').value = ch.instructions || '';
   document.getElementById('editType').value = ch.type;
   document.getElementById('editGrade').value = ch.grade;
   document.getElementById('editCategory').value = ch.category;
@@ -1293,7 +1289,7 @@ function backToTeacherChapters() {
 function saveChapterSettings() {
   var payload = {
     title: document.getElementById('editTitle').value.trim(),
-    desc: document.getElementById('editDesc').value.trim(),
+    instructions: document.getElementById('editInstructions').value.trim(),
     type: document.getElementById('editType').value,
     grade: document.getElementById('editGrade').value,
     category: document.getElementById('editCategory').value,
@@ -1419,7 +1415,7 @@ function _renderChapterListForAnalysis() {
       '<span class="badge badge-grade">' + ch.grade + '. r</span>' +
       '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
       (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span></div>' +
-      '<div class="chapter-desc">' + (ch.desc || '') + '</div></div></div>';
+      '<div class="chapter-desc">' + (ch.instructions || '') + '</div></div></div>';
   });
   c.innerHTML = html;
 }
