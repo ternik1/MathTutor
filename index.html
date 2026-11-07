@@ -9,10 +9,10 @@
     tex: {
       inlineMath: [['$', '$'], ['\\(', '\\)']],
       displayMath: [['$$', '$$'], ['\\[', '\\]']],
-      processEscapes: true
+      processEscapes: true,
+      processEnvironments: true
     },
-    svg: { fontCache: 'global' },
-    startup: { typeset: false }
+    svg: { fontCache: 'global' }
   };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
@@ -212,7 +212,6 @@
   .chapter-actions button:hover { background: #e0e0ea; transform: none; box-shadow: none; }
   .chapter-actions button.del { background: #fdecea; color: #c0392b; }
   .chapter-actions button.del:hover { background: #f9d6d1; }
-  /* Modal za urejanje učenca */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     display: flex; align-items: center; justify-content: center;
@@ -491,18 +490,30 @@ var editingStudentUsername = null;
 
 function authHeaders() { return currentUser ? { 'x-admin-user': currentUser.username } : {}; }
 
-function renderMath(el) {
+/* ============================================================
+   MATHJAX – varno izrisovanje z čakanjem na startup.promise
+   ============================================================ */
+function normalizeLatex(text) {
+  if (!text) return text;
+  // Odstrani podvojene backslashe (\\frac -> \frac)
+  return String(text).replace(/\\\\/g, '\\');
+}
+
+async function renderMath(el) {
   if (!el) return;
-  var attempts = 20;
-  var tryRender = function () {
-    if (window.MathJax && MathJax.typesetPromise) {
-      try { MathJax.typesetPromise([el]).catch(function () {}); } catch (e) {}
-    } else if (attempts > 0) {
-      attempts--;
-      setTimeout(tryRender, 200);
+  // Počakaj, da je MathJax pripravljen
+  if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
+    try { await MathJax.startup.promise; } catch (e) {}
+  } else {
+    // Če MathJax še ni naložen, počakaj do 5 sekund
+    let waited = 0;
+    while ((!window.MathJax || !MathJax.startup || !MathJax.startup.promise) && waited < 5000) {
+      await new Promise(r => setTimeout(r, 100));
+      waited += 100;
     }
-  };
-  tryRender();
+  }
+  if (!window.MathJax || !MathJax.typesetPromise) return;
+  try { await MathJax.typesetPromise([el]); } catch (e) { /* tiho */ }
 }
 
 /* ============================================================
@@ -561,7 +572,7 @@ function openCategory(cat) {
     cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje';
   document.getElementById('categoryInfo').textContent = 'Razred: ' + currentGrade + '.';
 
-  fetch('/api/chapters?grade=' + currentGrade)
+  fetch('/api/chapters?grade=' + currentGrade, { cache: 'no-store' })
     .then(r => r.json())
     .then(list => { allChapters = list; renderStudentChapterList(); })
     .catch(() => { document.getElementById('studentChapterList').innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
@@ -624,9 +635,9 @@ function startOrResumeSession(ch) {
       llmState.correct = data.correct || 0;
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
       if (data.hasCurrentTask && data.currentTask) {
-        currentTask = { question: data.currentTask.question, text: data.currentTask.question, level: data.currentTask.level };
+        currentTask = { question: normalizeLatex(data.currentTask.question), text: normalizeLatex(data.currentTask.question), level: data.currentTask.level };
         var tt = document.getElementById('taskText');
-        tt.textContent = data.currentTask.question;
+        tt.textContent = currentTask.question;
         renderMath(tt);
         var banner = document.getElementById('resumeBanner');
         banner.textContent = '↩️ Nadaljuješ, kjer si končal. Pravilnih: ' + data.correct + '/5, raven: ' + data.level + '/5.';
@@ -672,11 +683,11 @@ function loadLLMTask(isRetry) {
     .then(data => {
       if (data.error) { tt.textContent = 'Napaka: ' + data.error; return; }
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
-      currentTask = { question: data.question, text: data.question, level: data.level };
+      currentTask = { question: normalizeLatex(data.question), text: normalizeLatex(data.question), level: data.level };
       llmState.level = data.level;
       llmState.correct = data.correct;
       llmState.awaitingNext = false;
-      tt.textContent = data.question;
+      tt.textContent = currentTask.question;
       renderMath(tt);
       var inp = document.getElementById('answerInput');
       inp.value = ''; inp.disabled = false;
@@ -747,12 +758,12 @@ function checkAnswer() {
         var html = '<div class="explanation"><b>Razlaga:</b>';
         if (Array.isArray(data.steps) && data.steps.length) {
           html += '<ol>';
-          data.steps.forEach(s => { html += '<li>' + s + '</li>'; });
+          data.steps.forEach(s => { html += '<li>' + normalizeLatex(s) + '</li>'; });
           html += '</ol>';
         } else {
-          html += '<p>Pravilen odgovor je ' + (data.correctAnswerRaw || data.correctAnswer) + '.</p>';
+          html += '<p>Pravilen odgovor je ' + normalizeLatex(data.correctAnswerRaw || data.correctAnswer) + '.</p>';
         }
-        html += '<div class="correct-answer">Pravilen odgovor: ' + (data.correctAnswerRaw || data.correctAnswer) + '</div>';
+        html += '<div class="correct-answer">Pravilen odgovor: ' + normalizeLatex(data.correctAnswerRaw || data.correctAnswer) + '</div>';
         html += '</div>';
         box.innerHTML = html;
         renderMath(box);
@@ -799,8 +810,8 @@ function openStudentAnalysis() {
         if (item.topErrors.length) {
           html += '<h3 style="margin-top:16px;">Najpogostejše napake</h3>';
           item.topErrors.forEach(e => {
-            html += '<div class="error-item"><b>' + e.question + '</b><br>Tvoj odgovor: ' + e.userAns +
-                    ' • Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>';
+            html += '<div class="error-item"><b>' + normalizeLatex(e.question) + '</b><br>Tvoj odgovor: ' + e.userAns +
+                    ' • Pravilno: ' + normalizeLatex(e.correctAns) + ' • Ponovitve: ' + e.count + '</div>';
           });
         }
         html += '</div>';
@@ -942,7 +953,7 @@ function toggleDeadlineField() {
   document.getElementById('newChapterDeadline').classList.toggle('hidden', c !== 'domaca');
 }
 function loadTeacherChapters() {
-  fetch('/api/chapters').then(r => r.json()).then(list => { allChapters = list; renderTeacherChapterList(); })
+  fetch('/api/chapters', { cache: 'no-store' }).then(r => r.json()).then(list => { allChapters = list; renderTeacherChapterList(); })
     .catch(() => { document.getElementById('teacherChapterList').innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
 }
 function renderTeacherChapterList() {
@@ -1157,7 +1168,7 @@ function renderTeacherByChapter() {
   var c = document.getElementById('analysisContent');
   if (!allChapters.length) {
     c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam sklope ...</p>';
-    fetch('/api/chapters').then(r => r.json()).then(list => {
+    fetch('/api/chapters', { cache: 'no-store' }).then(r => r.json()).then(list => {
       allChapters = list;
       _renderChapterListForAnalysis();
     });
@@ -1200,7 +1211,7 @@ function runChapterAnalysis(chapterId) {
       if (data.topClassErrors && data.topClassErrors.length) {
         html += '<h3 style="margin-top:16px;">Najpogostejše napake</h3>';
         data.topClassErrors.forEach(e => {
-          html += '<div class="error-item"><b>' + e.question + '</b><br>Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>';
+          html += '<div class="error-item"><b>' + normalizeLatex(e.question) + '</b><br>Pravilno: ' + normalizeLatex(e.correctAns) + ' • Ponovitve: ' + e.count + '</div>';
         });
       }
       html += '<h3 style="margin-top:16px;">Po učencih</h3><table><thead><tr><th>Učenec</th><th>Poskusi</th><th>Pravilnih</th><th>Uspešnost</th></tr></thead><tbody>';
@@ -1310,8 +1321,8 @@ function toggleChapterDetail(chapterId) {
   if (ch.topErrors && ch.topErrors.length) {
     html += '<h3 style="margin-top:14px;">Najpogostejše napake</h3>';
     ch.topErrors.forEach(e => {
-      html += '<div class="error-item"><b>' + e.question + '</b><br>' +
-        'Napačno: ' + e.userAns + ' • Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>';
+      html += '<div class="error-item"><b>' + normalizeLatex(e.question) + '</b><br>' +
+        'Napačno: ' + e.userAns + ' • Pravilno: ' + normalizeLatex(e.correctAns) + ' • Ponovitve: ' + e.count + '</div>';
     });
   }
 
@@ -1319,7 +1330,7 @@ function toggleChapterDetail(chapterId) {
     html += '<h3 style="margin-top:14px;">Zadnji poskusi</h3>';
     ch.recentHistory.forEach(h => {
       html += '<div class="history-item ' + (h.ok ? 'ok' : 'fail') + '">' +
-        '<span class="history-q">' + h.question + '</span>' +
+        '<span class="history-q">' + normalizeLatex(h.question) + '</span>' +
         '<span class="badge-' + (h.ok ? 'ok' : 'fail') + '">' + (h.ok ? '✓' : '✗') + '</span></div>';
     });
   }
