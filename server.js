@@ -216,50 +216,6 @@ async function saveData() {
 }
 
 /* ============================================================
-   UČNI NAČRT – KLJUČNE TEME PO RAZREDIH
-   ============================================================ */
-const CURRICULUM = {
-  6: [
-    'naravna števila in decimalna števila',
-    'seštevanje, odštevanje, množenje in deljenje decimalnih števil',
-    'ulomki (enaki imenovalci, krajšanje, razširjanje)',
-    'obseg in ploščina pravokotnika in kvadrata',
-    'kocka in kvader (površina, prostornina)',
-    'koti (merjenje, vrste kotov)',
-    'preproste enačbe z eno neznanko'
-  ],
-  7: [
-    'cela in racionalna števila',
-    'ulomki (različni imenovalci, množenje, deljenje)',
-    'decimalna števila in odstotki',
-    'obseg in ploščina trikotnika, paralelograma, trapeza',
-    'krožnica in krog (obseg, ploščina)',
-    'potence in koreni (osnove)',
-    'linearna enačba z eno neznanko',
-    'sorazmerje in obratno sorazmerje'
-  ],
-  8: [
-    'Pitagorov izrek',
-    'racionalna števila in izrazi',
-    'linearna enačba in neenačba',
-    'potence z celimi eksponenti',
-    'koreni',
-    'podobnost in skladnost',
-    'krog in krožni izsek',
-    'koordinatni sistem'
-  ],
-  9: [
-    'linearne funkcije',
-    'sistemi linearnih enačb',
-    'kvadratna enačba',
-    'podobnost',
-    'prostornina in površina valja, stožca, krogle',
-    'trigonometrija pravokotnega trikotnika',
-    'statistika in verjetnost'
-  ]
-};
-
-/* ============================================================
    STROGA PRAVILA GLEDE NA RAZRED IN TEMO
    ============================================================ */
 function strictLevelRules(grade, topic) {
@@ -364,15 +320,6 @@ function levelDescriptionsForGrade(grade) {
   };
   const arr = base[grade] || base[8];
   return { 1: arr[0], 2: arr[1], 3: arr[2], 4: arr[3], 5: arr[4] };
-}
-
-// Preveri, ali naloga vsebuje Pitagorov izrek, ko ta ni tema
-function usesPitagora(question, topic) {
-  const t = (topic || '').toLowerCase();
-  const q = (question || '').toLowerCase();
-  const topicHasPitagora = t.includes('pitagor');
-  const questionHasPitagora = q.includes('pitagor') || /hipotenuz/.test(q) || /katet/.test(q);
-  return questionHasPitagora && !topicHasPitagora;
 }
 
 function taskTypeAllowed(question, topic) {
@@ -646,14 +593,18 @@ app.get('/api/chapters/:id', (req, res) => {
 });
 
 app.post('/api/chapters', requireAdmin, async (req, res) => {
-  const { title, desc, type, grade, category, deadline, topic } = req.body || {};
+  const { title, instructions, type, grade, category, deadline, topic } = req.body || {};
   if (!title || !type || !grade || !category) return res.status(400).json({ error: 'Manjka polje.' });
   if (category === 'domaca' && !deadline) return res.status(400).json({ error: 'Za domačo rok obvezen.' });
   const ch = {
     id: 'ch_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-    title, desc: desc || '', type,
-    grade: parseInt(grade, 10), category,
-    deadline: deadline || null, topic: topic || null,
+    title,
+    instructions: instructions || '',
+    type,
+    grade: parseInt(grade, 10),
+    category,
+    deadline: deadline || null,
+    topic: topic || null,
     createdAt: Date.now()
   };
   DATA.chapters.push(ch);
@@ -664,9 +615,9 @@ app.post('/api/chapters', requireAdmin, async (req, res) => {
 app.put('/api/chapters/:id', requireAdmin, async (req, res) => {
   const ch = DATA.chapters.find(c => c.id === req.params.id);
   if (!ch) return res.status(404).json({ error: 'Poglavje ne obstaja.' });
-  const { title, desc, type, grade, category, deadline, topic } = req.body || {};
+  const { title, instructions, type, grade, category, deadline, topic } = req.body || {};
   if (title !== undefined) ch.title = title;
-  if (desc !== undefined) ch.desc = desc;
+  if (instructions !== undefined) ch.instructions = instructions;
   if (type !== undefined) ch.type = type;
   if (grade !== undefined) ch.grade = parseInt(grade, 10);
   if (category !== undefined) ch.category = category;
@@ -769,8 +720,6 @@ app.post('/api/generate-task', async (req, res) => {
   const levelDesc = strictRules[level] || strictRules[3];
   const seed = username + '_' + Date.now() + '_' + Math.random();
 
-  const curriculumForGrade = (CURRICULUM[grade] || []).map((t, i) => `${i + 1}. ${t}`).join('\n');
-
   if (!DATA.recentTasks[username]) DATA.recentTasks[username] = {};
   if (!DATA.recentTasks[username][chapterId]) DATA.recentTasks[username][chapterId] = [];
   const recent = DATA.recentTasks[username][chapterId];
@@ -798,24 +747,21 @@ app.post('/api/generate-task', async (req, res) => {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
   }
 
-  // Sistemsko sporočilo – stroga navodila
-  const systemMessage = `Si matematični tutor za slovenske osnovnošolce. Tvoja edina naloga je generiranje matematične naloge iz TOČNO DOLOČENE TEME in RAZREDA.
+  // Sistemsko sporočilo – z morebitnimi navodili učitelja
+  let systemMessage = `Si matematični tutor za slovenske osnovnošolce. Generiraš natanko eno matematično nalogo.
 
-⚠️⚠️⚠️ NAJPOMEMBNEJŠE PRAVILO ⚠️⚠️⚠️
-Naloga MORA biti izključno iz teme "${ch.topic || ch.title}" in iz snovi ${grade}. razreda.
+RAZRED: ${grade}
+TEMA SKLOPA: "${ch.topic || ch.title}"
 
-Prepovedano je uporabljati katerokoli drugo matematično orodje ali snow, ki ni del teme. Če je tema "obseg in ploščina trikotnika", NE uporabljaj Pitagorovega izreka, tudi če bi z njim lažje rešil nalogo. Naloga mora biti rešljiva SAMO z znanjem, ki je del teme.
-
-Teme, ki so dovoljene za ${grade}. razred:
-${curriculumForGrade}
-
-Posebej prepovedano:
-${grade < 8 ? '- Pitagorov izrek, potence, koreni, kvadratna enačba, trigonometrija.' : ''}
-${grade === 8 ? '- Kvadratna enačba, trigonometrija, linearne funkcije.' : ''}
-
-Naloga naj se zgleduje po nalogah iz slovenskih i-učbenikov (eucbeniki.sio.si) in delovnih listov. Lahko je identična po strukturi, le števila naj bodo drugačna.
+Naloga MORA biti izključno iz te teme in iz snovi ${grade}. razreda.
+Ne uporabljaj matematičnih orodij, ki niso del teme (npr. Pitagorovega izreka, če tema ni Pitagorov izrek).
+Naloga naj bo rešljiva SAMO z znanjem te teme.
 
 Vrni izključno JSON.`;
+
+  if (ch.instructions && String(ch.instructions).trim() !== '') {
+    systemMessage += `\n\n⚠️⚠️ UKAZ UČITELJA (ima prednost pred vsemi drugimi pravili):\n${String(ch.instructions).trim()}\n\nUpoštevaj ta ukaz do črke natančno. Če ukaz zahteva določen tip naloge (npr. trikotnik), NE uporabi drugega lika (npr. pravokotnika).`;
+  }
 
   let prompt = `Tema: "${ch.topic || ch.title}"
 Razred: ${grade}
@@ -893,12 +839,6 @@ Vrni JSON:
       }
 
       const questionSanitized = normalizeLatex(data.question);
-
-      // Preveri Pitagorov izrek, ko ta ni tema
-      if (usesPitagora(questionSanitized, ch.topic || ch.title)) {
-        prompt += `\n\nOPOZORILO: Naloga vsebuje Pitagorov izrek, ki NI del teme "${ch.topic || ch.title}". Generiraj nalogo, ki je rešljiva SAMO z znanjem te teme, brez Pitagorovega izreka.`;
-        continue;
-      }
 
       if (!taskTypeAllowed(questionSanitized, ch.topic || ch.title)) {
         prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip.`;
