@@ -260,6 +260,15 @@
     margin-bottom: 4px; font-weight: 600;
   }
   .field-hint { font-size: 12px; color: #999; margin-top: -8px; margin-bottom: 12px; }
+  .level-indicator {
+    display: flex; gap: 6px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .level-pill {
+    padding: 6px 14px; border-radius: 20px; font-size: 13px;
+    font-weight: 600; background: #f0f0f5; color: #888;
+  }
+  .level-pill.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+  .level-pill.done { background: #d4edda; color: #27ae60; }
 </style>
 </head>
 <body>
@@ -464,6 +473,7 @@
       <button class="secondary" onclick="backToStudentList()">← Nazaj</button>
     </div>
     <div id="resumeBanner" class="resume-banner hidden"></div>
+    <div class="level-indicator" id="levelIndicator"></div>
     <div class="progress">
       <span id="progressTasks"></span>
       <span id="progressStats"></span>
@@ -530,7 +540,13 @@ var currentGrade = null;
 var currentCategory = null;
 var currentChapter = null;
 var currentTask = null;
-var llmState = { level: 1, correct: 0, target: 5, awaitingNext: false };
+var llmState = {
+  level: 1,
+  correct: 0,
+  progression: { level: 1, correctInLevel: 0 },
+  requiredInLevel: 2,
+  awaitingNext: false
+};
 var allChapters = [];
 var currentDetailUsername = null;
 var studentsList = [];
@@ -772,7 +788,6 @@ function renderStudentChapterList() {
     var locked = ch.category === 'domaca' && ch.deadline && Date.now() > new Date(ch.deadline).getTime();
     var div = document.createElement('div');
     div.className = 'chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje ' : '') + (locked ? 'locked' : '');
-    // Učenec vidi samo naslov in kratek opis (ch.instructions), NE llmPrompt
     var html = '<div class="chapter-left"><div class="chapter-title">' + ch.title + '</div><div class="chapter-desc">' + (ch.instructions || '') + '</div>';
     if (ch.deadline) html += '<div class="chapter-deadline">⏰ Rok: ' + new Date(ch.deadline).toLocaleString('sl-SI') + (locked ? ' (POTEKEL)' : '') + '</div>';
     html += '</div>';
@@ -796,7 +811,6 @@ function openChapter(ch) {
   document.getElementById('studentChaptersView').classList.add('hidden');
   document.getElementById('tutorView').classList.remove('hidden');
   document.getElementById('tutorTitle').textContent = ch.title;
-  // Učenec vidi le kratek opis (ch.instructions), NE llmPrompt
   document.getElementById('tutorDesc').textContent = ch.instructions || '';
   document.getElementById('explanationBox').innerHTML = '';
   document.getElementById('feedback').textContent = '';
@@ -808,10 +822,39 @@ function openChapter(ch) {
   document.getElementById('taskText').innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam ...</span>';
   document.getElementById('resumeBanner').classList.add('hidden');
   clearSketch();
+  updateLevelIndicator();
 
   if (ch.type === 'llm' || ch.type === 'cela_stevila') startOrResumeSession(ch);
   else document.getElementById('taskText').textContent = 'Za to poglavje tutor še ni na voljo.';
 }
+
+function updateLevelIndicator() {
+  var el = document.getElementById('levelIndicator');
+  if (!el) return;
+  var prog = llmState.progression || { level: 1, correctInLevel: 0 };
+  var names = { 1: 'Osnovna', 2: 'Srednja', 3: 'Zahtevna' };
+  var html = '';
+  for (var lvl = 1; lvl <= 3; lvl++) {
+    var cls = 'level-pill';
+    if (lvl < prog.level) cls += ' done';
+    else if (lvl === prog.level) cls += ' active';
+    var mark = lvl < prog.level ? '✓ ' : '';
+    html += '<span class="' + cls + '">' + mark + names[lvl] + ' (' + lvl + '/3)</span>';
+  }
+  el.innerHTML = html;
+}
+
+function updateProgressUI_LLM() {
+  var prog = llmState.progression || { level: 1, correctInLevel: 0 };
+  var req = llmState.requiredInLevel || (prog.level === 3 ? 1 : 2);
+  var names = { 1: 'osnovna', 2: 'srednja', 3: 'zahtevna' };
+  document.getElementById('progressTasks').textContent =
+    'Stopnja ' + prog.level + '/3 (' + names[prog.level] + ')  •  ' +
+    prog.correctInLevel + '/' + req + ' pravilnih na tej stopnji';
+  document.getElementById('progressStats').textContent = currentChapter ? currentChapter.title : '';
+  updateLevelIndicator();
+}
+
 function startOrResumeSession(ch) {
   fetch('/api/start-session', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -823,7 +866,7 @@ function startOrResumeSession(ch) {
       llmState.level = data.level || 1;
       llmState.correct = data.correct || 0;
       llmState.progression = data.progression || { level: 1, correctInLevel: 0 };
-      llmState.requiredInLevel = data.requiredInLevel || 2;
+      llmState.requiredInLevel = data.requiredInLevel || (llmState.progression.level === 3 ? 1 : 2);
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
       if (data.hasCurrentTask && data.currentTask) {
         currentTask = {
@@ -839,7 +882,7 @@ function startOrResumeSession(ch) {
         if (currentTask.sketch) renderSketch(currentTask.sketch);
         renderAnswerFields(currentTask.answers);
         var banner = document.getElementById('resumeBanner');
-        banner.textContent = '↩️ Nadaljuješ, kjer si končal. Pravilnih: ' + data.correct + '/5, raven: ' + data.level + '/5.';
+        banner.textContent = '↩️ Nadaljuješ, kjer si končal. Stopnja ' + llmState.progression.level + '/3, pravilnih na stopnji: ' + llmState.progression.correctInLevel + '/' + llmState.requiredInLevel + '.';
         banner.classList.remove('hidden');
         if (data.currentTask.awaitingNext) {
           document.getElementById('answersContainer').querySelectorAll('input').forEach(i => i.disabled = true);
@@ -857,15 +900,7 @@ function startOrResumeSession(ch) {
     })
     .catch(() => { document.getElementById('taskText').textContent = 'Napaka pri povezavi.'; });
 }
-function updateProgressUI_LLM() {
-  var prog = llmState.progression || { level: 1, correctInLevel: 0 };
-  var req = llmState.requiredInLevel || (prog.level === 3 ? 1 : 2);
-  var levelNames = { 1: 'osnovna', 2: 'srednja', 3: 'zahtevna' };
-  document.getElementById('progressTasks').textContent =
-    'Stopnja ' + prog.level + '/3 (' + levelNames[prog.level] + ')  •  ' +
-    prog.correctInLevel + '/' + req + ' pravilnih na tej stopnji';
-  document.getElementById('progressStats').textContent = currentChapter.title;
-}
+
 function renderAnswerFields(answers) {
   var cont = document.getElementById('answersContainer');
   cont.innerHTML = '';
@@ -890,6 +925,7 @@ function renderAnswerFields(answers) {
   var first = cont.querySelector('.answer-field');
   if (first) first.focus();
 }
+
 function loadLLMTask(isRetry) {
   var tt = document.getElementById('taskText');
   tt.innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam tvojo nalogo ...</span>';
@@ -908,7 +944,11 @@ function loadLLMTask(isRetry) {
   })
     .then(r => r.json())
     .then(data => {
-      if (data.error) { tt.textContent = 'Napaka: ' + data.error; return; }
+      if (data.error) {
+        tt.innerHTML = 'Napaka pri generiranju: ' + data.error +
+          '<br><br><button class="secondary" onclick="loadLLMTask(false)">Poskusi znova</button>';
+        return;
+      }
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
       currentTask = {
         question: normalizeLatex(data.question),
@@ -920,8 +960,8 @@ function loadLLMTask(isRetry) {
       llmState.level = data.level;
       llmState.correct = data.correct;
       llmState.awaitingNext = false;
-      llmState.progression = data.progression || { level: data.level || 1, correctInLevel: 0 };
-      llmState.requiredInLevel = data.requiredInLevel || 2;
+      if (data.progression) llmState.progression = data.progression;
+      if (data.requiredInLevel) llmState.requiredInLevel = data.requiredInLevel;
       tt.textContent = currentTask.question;
       renderMath(tt);
       if (currentTask.sketch) renderSketch(currentTask.sketch);
@@ -930,8 +970,12 @@ function loadLLMTask(isRetry) {
       document.getElementById('checkBtn').style.display = '';
       updateProgressUI_LLM();
     })
-    .catch(() => { tt.textContent = 'Napaka pri povezavi.'; });
+    .catch(() => {
+      tt.innerHTML = 'Napaka pri povezavi.' +
+        '<br><br><button class="secondary" onclick="loadLLMTask(false)">Poskusi znova</button>';
+    });
 }
+
 function showLLMFinished(correct, attempts) {
   document.getElementById('taskText').textContent = '🎉 Bravo! Rešil si vse naloge na vseh treh stopnjah!';
   document.getElementById('progressTasks').textContent = 'Seja zaključena';
@@ -940,16 +984,28 @@ function showLLMFinished(correct, attempts) {
   document.getElementById('checkBtn').style.display = 'none';
   document.getElementById('retryBtn').style.display = 'none';
   clearSketch();
+  if (llmState.progression) {
+    llmState.progression.level = 3;
+    llmState.progression.correctInLevel = llmState.requiredInLevel || 1;
+  }
+  updateLevelIndicator();
   document.getElementById('explanationBox').innerHTML =
     '<div style="text-align:center;margin-top:15px;">' +
     '<button class="secondary" onclick="startFresh()">Nova seja</button></div>';
 }
+
 function startFresh() {
   fetch('/api/reset-session', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id })
-  }).then(() => startOrResumeSession(currentChapter));
+  }).then(() => {
+    llmState.progression = { level: 1, correctInLevel: 0 };
+    llmState.requiredInLevel = 2;
+    llmState.correct = 0;
+    startOrResumeSession(currentChapter);
+  });
 }
+
 function checkAnswer() {
   if (!currentTask) return;
   var inputs = document.querySelectorAll('.answer-field');
@@ -982,6 +1038,8 @@ function checkAnswer() {
       if (data.finished) {
         fb.className = 'feedback correct';
         fb.textContent = '✅ ' + data.message;
+        if (data.progression) llmState.progression = data.progression;
+        if (data.requiredInLevel) llmState.requiredInLevel = data.requiredInLevel;
         showLLMFinished(data.correctCount, data.attempts);
         return;
       }
@@ -989,12 +1047,11 @@ function checkAnswer() {
         fb.className = 'feedback correct';
         fb.textContent = '✅ ' + data.message;
         llmState.correct = data.correctCount;
-        llmState.level = data.nextLevel;
-        llmState.correct = data.correctCount;
         if (data.progression) llmState.progression = data.progression;
         if (data.requiredInLevel) llmState.requiredInLevel = data.requiredInLevel;
         llmState.level = (data.progression && data.progression.level) || data.nextLevel || llmState.level;
         document.getElementById('explanationBox').innerHTML = '';
+        updateProgressUI_LLM();
         setTimeout(() => { loadLLMTask(false); }, 1300);
       } else {
         fb.className = 'feedback wrong';
@@ -1019,11 +1076,13 @@ function checkAnswer() {
         box.innerHTML = html;
         renderMath(box);
         llmState.awaitingNext = true;
+        updateProgressUI_LLM();
         document.getElementById('retryBtn').style.display = '';
       }
     })
     .catch(() => { fb.className = 'feedback wrong'; fb.textContent = 'Napaka pri povezavi.'; });
 }
+
 function retrySimilar() {
   document.getElementById('retryBtn').style.display = 'none';
   document.getElementById('checkBtn').disabled = false;
