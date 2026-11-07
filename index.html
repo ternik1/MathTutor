@@ -40,6 +40,7 @@
     width: 100%; padding: 12px 15px; border: 2px solid #ddd;
     border-radius: 10px; margin-bottom: 12px; background: white;
   }
+  textarea { resize: vertical; min-height: 80px; }
   input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
   button {
     background: linear-gradient(135deg, #667eea, #764ba2);
@@ -363,9 +364,9 @@
 
     <div id="teacherChapters" class="hidden">
       <h3>Dodaj sklop</h3>
-      <input id="newChapterTitle" placeholder="Naslov sklopa">
-      <textarea id="newChapterInstructions" placeholder="Kakšne naloge naj Groq sestavlja? (npr. 'Naloge iz obsega in ploščine trikotnika. Podane so vse tri stranice in višina. Brez Pitagorovega izreka.'"></textarea>
-      <select id="newChapterType" onchange="toggleTopicField()">
+      <input id="newChapterTitle" placeholder="Naslov sklopa (npr. Obseg in ploščina trikotnika)">
+      <textarea id="newChapterInstructions" placeholder="Kakšne naloge naj Groq sestavlja? (npr. 'Naloge iz obsega in ploščine trikotnika. Podane so vse tri stranice in višina. Brez Pitagorovega izreka. Skica naj bo trikotnik.'"></textarea>
+      <select id="newChapterType">
         <option value="llm">LLM tutor (poljubna tema prek Groq)</option>
         <option value="cela_stevila">Cela števila (vgrajen generator)</option>
         <option value="generic">Splošno (brez tutorja)</option>
@@ -381,7 +382,6 @@
         <option value="utrjevanje">Utrjevanje (vedno odprto)</option>
       </select>
       <input id="newChapterDeadline" type="datetime-local">
-      <input id="newChapterTopic" placeholder="Tema za LLM (npr. Pitagorov izrek, Ulomki)">
       <button class="secondary" onclick="addChapter()">+ Dodaj sklop</button>
       <div class="error" id="chapterError" style="margin-top:8px;"></div>
 
@@ -427,7 +427,6 @@
         <option value="utrjevanje">Utrjevanje</option>
       </select>
       <input id="editDeadline" type="datetime-local">
-      <input id="editTopic" placeholder="Tema za LLM">
       <div class="row" style="margin-top:10px;">
         <button class="success" onclick="saveChapterSettings()" style="flex:1;">💾 Shrani</button>
         <button class="danger" onclick="deleteChapterSettings()" style="flex:0 0 auto;">🗑️ Izbriši</button>
@@ -1174,9 +1173,6 @@ function exportPDF() {
   window.open('/api/students/pdf/' + filter + '?x-admin-user=' + encodeURIComponent(currentUser.username), '_blank');
 }
 
-function toggleTopicField() {
-  document.getElementById('newChapterTopic').classList.toggle('hidden', document.getElementById('newChapterType').value !== 'llm');
-}
 function toggleDeadlineField() {
   var c = document.getElementById('newChapterCategory').value;
   document.getElementById('newChapterDeadline').classList.toggle('hidden', c !== 'domaca');
@@ -1233,22 +1229,19 @@ function addChapter() {
   var grade = document.getElementById('newChapterGrade').value;
   var category = document.getElementById('newChapterCategory').value;
   var deadline = document.getElementById('newChapterDeadline').value;
-  var topic = document.getElementById('newChapterTopic').value.trim();
   var err = document.getElementById('chapterError');
   err.textContent = '';
   if (!title) { err.textContent = 'Vnesi naslov.'; return; }
-  if (type === 'llm' && !topic) { err.textContent = 'Za LLM vnesi temo.'; return; }
   if (category === 'domaca' && !deadline) { err.textContent = 'Za domačo določi rok.'; return; }
   fetch('/api/chapters', {
     method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
-    body: JSON.stringify({ title, instructions, type, grade, category, deadline, topic })
+    body: JSON.stringify({ title, instructions, type, grade, category, deadline })
   })
     .then(r => r.json())
     .then(data => {
       if (data.error) { err.textContent = data.error; return; }
       document.getElementById('newChapterTitle').value = '';
       document.getElementById('newChapterInstructions').value = '';
-      document.getElementById('newChapterTopic').value = '';
       document.getElementById('newChapterDeadline').value = '';
       loadTeacherChapters();
     });
@@ -1269,7 +1262,6 @@ function openChapterSettings(id) {
   document.getElementById('editGrade').value = ch.grade;
   document.getElementById('editCategory').value = ch.category;
   document.getElementById('editDeadline').value = ch.deadline ? toLocalDatetime(ch.deadline) : '';
-  document.getElementById('editTopic').value = ch.topic || '';
   document.getElementById('settingsError').textContent = '';
   toggleEditDeadline();
 }
@@ -1293,8 +1285,7 @@ function saveChapterSettings() {
     type: document.getElementById('editType').value,
     grade: document.getElementById('editGrade').value,
     category: document.getElementById('editCategory').value,
-    deadline: document.getElementById('editDeadline').value || null,
-    topic: document.getElementById('editTopic').value.trim()
+    deadline: document.getElementById('editDeadline').value || null
   };
   var err = document.getElementById('settingsError');
   err.textContent = '';
