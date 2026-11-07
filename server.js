@@ -81,6 +81,47 @@ function extractNumbers(text) {
   return nums;
 }
 
+/* ============================================================
+   POMOŽNE ZA PODOBNOST (manjkale v zadnji različici!)
+   ============================================================ */
+function extractOps(text) {
+  if (!text) return '';
+  const ops = [];
+  if (/\+/.test(text)) ops.push('+');
+  if (/-|−/.test(text)) ops.push('-');
+  if (/\\cdot|·|\*|\\times/.test(text)) ops.push('*');
+  if (/\/|:|\\div/.test(text)) ops.push('/');
+  if (/\\sqrt/.test(text)) ops.push('sqrt');
+  if (/\^/.test(text)) ops.push('^');
+  return ops.sort().join('');
+}
+
+function numbersOverlap(a, b) {
+  if (!a.length || !b.length) return false;
+  const setA = new Set(a.map(x => Math.abs(x).toFixed(4)));
+  const setB = new Set(b.map(x => Math.abs(x).toFixed(4)));
+  let common = 0;
+  setA.forEach(x => { if (setB.has(x)) common++; });
+  const minSize = Math.min(setA.size, setB.size);
+  return minSize > 0 && common / minSize >= 0.75;
+}
+
+function isTooSimilar(newTask, recentTasks) {
+  if (!newTask || !newTask.question) return false;
+  const newNums = extractNumbers(newTask.question);
+  const newOps = extractOps(newTask.question);
+  for (const t of recentTasks) {
+    if (!t || !t.question) continue;
+    const oldNums = extractNumbers(t.question);
+    const oldOps = extractOps(t.question);
+    if (newOps === oldOps && numbersOverlap(newNums, oldNums)) return true;
+  }
+  return false;
+}
+
+/* ============================================================
+   PREVERJANJE SKICE
+   ============================================================ */
 function textHasNumbers(text) {
   if (!text) return false;
   const cleaned = String(text).replace(/^\s*\d+[.)]\s*/, '');
@@ -103,9 +144,6 @@ function hasSketchData(sketch) {
   return !!(sketch && sketch.type);
 }
 
-/* ============================================================
-   PREVERJANJE SKICE
-   ============================================================ */
 function validateSketch(question, sketch) {
   if (!sketch || !sketch.type) return { ok: true };
 
@@ -892,7 +930,7 @@ app.post('/api/generate-task', async (req, res) => {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
   }
 
-  let systemMessage = `Si matematični tutor za slovenske osnovnošolce. Generiraš natanko eno matematično nalogo.
+  let systemMessage = `Si matematični tutor za slovenske osnovnošolce. Generiraš natanko eno matematično nalogo. Vrni izključno JSON objekt.
 
 RAZRED: ${grade}
 TEMA SKLOPA: "${topicText}"
@@ -1094,6 +1132,7 @@ Vrni JSON:
     if (st === 429) msg = 'Preveč zahtev. Počakaj minuto.';
     else if (st === 401) msg = 'Neveljaven API ključ.';
     else if (st === 404) msg = 'Model ni dosegljiv.';
+    else msg = 'Napaka: ' + (err.message || 'neznana');
     res.status(500).json({ error: msg });
   }
 });
@@ -1381,7 +1420,7 @@ Poskusi: ${total}, pravilnih: ${correct} (${pct}%)
 Aktivnih: ${perStudent.length}
 Napake: ${JSON.stringify(topClassErrors.map(e => ({ q: e.question, n: e.count })))}
 Po tipu: ${JSON.stringify(classByType)}
-Napiši 4–6 stavkov. JSON: {"text":"..."}`;
+Napiši 4–6 stavkov. Vrni JSON: {"text":"..."}`;
     const response = await callAI([{ role: 'user', content: prompt }]);
     const data = JSON.parse(response.choices[0].message.content);
     textAnalysis = data.text || null;
