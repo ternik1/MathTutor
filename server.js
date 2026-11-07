@@ -1,5 +1,5 @@
 // server.js
-// Zaženi lokalno:
+// Zaženi:
 //   $env:GROQ_API_KEY="gsk_..."
 //   $env:MONGODB_URI="mongodb+srv://..."
 //   node server.js
@@ -25,19 +25,15 @@ if (!process.env.MONGODB_URI) {
 }
 
 /* ============================================================
-   GROQ ODJEMALEC
-   ============================================================ */
-const groqClient = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || 'manjka-groq',
-  baseURL: 'https://api.groq.com/openai/v1'
-});
-
-const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
-
-/* ============================================================
    POMOŽNE
    ============================================================ */
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Odstrani podvojene backslashe (\\frac -> \frac)
+function normalizeLatex(s) {
+  if (!s) return s;
+  return String(s).replace(/\\\\/g, '\\');
+}
 
 function parseNumberString(raw) {
   if (raw === null || raw === undefined) return NaN;
@@ -124,6 +120,16 @@ function generatePassword() {
 }
 
 /* ============================================================
+   GROQ ODJEMALEC
+   ============================================================ */
+const groqClient = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY || 'manjka-groq',
+  baseURL: 'https://api.groq.com/openai/v1'
+});
+
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
+/* ============================================================
    SHRAMBA – MongoDB Atlas
    ============================================================ */
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -146,7 +152,6 @@ async function connectDB() {
     db = mongoClient.db('matematicni-tutor');
     console.log('✅ Povezan na MongoDB Atlas.');
 
-    // Naloži vse kolekcije v pomnilnik
     const usersDocs = await db.collection('users').find({}).toArray();
     usersDocs.forEach(d => { DATA.users[d._id] = d.value; });
 
@@ -165,7 +170,6 @@ async function connectDB() {
     const recentDocs = await db.collection('recentTasks').find({}).toArray();
     recentDocs.forEach(d => { DATA.recentTasks[d._id] = d.value; });
 
-    // Ustvari učitelja, če še ne obstaja
     if (!DATA.users['ucitelj']) {
       DATA.users['ucitelj'] = {
         firstName: 'Učitelj', lastName: '', grade: null,
@@ -183,27 +187,21 @@ async function connectDB() {
 async function saveData() {
   if (!db) return;
   try {
-    // users
     for (const [key, val] of Object.entries(DATA.users)) {
       await db.collection('users').updateOne({ _id: key }, { $set: { value: val } }, { upsert: true });
     }
-    // chapters
     for (const ch of DATA.chapters) {
       await db.collection('chapters').updateOne({ _id: ch.id }, { $set: { value: ch } }, { upsert: true });
     }
-    // stats
     for (const [key, val] of Object.entries(DATA.stats)) {
       await db.collection('stats').updateOne({ _id: key }, { $set: { value: val } }, { upsert: true });
     }
-    // analyses
     for (const [key, val] of Object.entries(DATA.analyses)) {
       await db.collection('analyses').updateOne({ _id: key }, { $set: { value: val } }, { upsert: true });
     }
-    // sessions
     for (const [key, val] of Object.entries(DATA.sessions)) {
       await db.collection('sessions').updateOne({ _id: key }, { $set: { value: val } }, { upsert: true });
     }
-    // recentTasks
     for (const [key, val] of Object.entries(DATA.recentTasks)) {
       await db.collection('recentTasks').updateOne({ _id: key }, { $set: { value: val } }, { upsert: true });
     }
@@ -474,7 +472,6 @@ app.put('/api/students/:username', requireAdmin, async (req, res) => {
       delete DATA.recentTasks[oldUsername];
     }
 
-    // Počisti staro uporabniško ime iz baze in shrani novo
     if (db) {
       await db.collection('users').deleteOne({ _id: oldUsername });
       await db.collection('stats').deleteOne({ _id: oldUsername });
@@ -705,7 +702,7 @@ Raven: ${level}/5.
 ⚠️ ZELO POMEMBNO – PRIMERNOST ZA RAZRED ${grade}:
 - Naloga MORA biti ustrezna za ${grade}. razred osnovne šole po slovenskem učnem načrtu.
 - Preden oblikuješ nalogo, PREVERI, ali so vsebina, števila in zahtevnost primerni za ${grade}. razred.
-- Zgleduj se po slovenskih i-učbenikih za matematiko (i-učbeniki so prosto dostopni na eucbeniki.sio.si) in po tipičnih nalogah, ki jih učenci ${grade}. razreda rešujejo.
+- Zgleduj se po slovenskih i-učbenikih za matematiko (i-učbeniki so prosto dostopni na eucbeniki.sio.si).
 - Če naloga ne bi bila primerna za ${grade}. razred, jo spremeni, preden jo vrneš.
 - Naloga mora ustrezati ravni ${level}/5: ${levelDesc}.
 
@@ -735,6 +732,7 @@ PRAVILA ZA NALOGO:
 - Generiraj NATANKO ENO nalogo, edinstveno za tega učenca.
 - Naloga naj bo kratka – lahko je SAMO RAČUN ali kratka besedilna naloga.
 - Uporabi LaTeX za matematične izraze: ulomki kot \\frac{a}{b}, potence kot x^{2}, koreni kot \\sqrt{x}, decimalna vejica kot 0{,}5.
+- V polju "answer_latex" uporabi ENAK zapis kot v besedilu naloge (en backslash pred \\frac).
 - Naloga naj bo v slovenščini, primerna ${grade}. razredu.
 - Odgovor naj bo enolično določljiv in zapisan kot ŠTEVILO.
 
@@ -763,7 +761,11 @@ Vrni izključno JSON:
         prompt += `\n\nOPOZORILO: Odgovor ni število. Vrni številski odgovor.`;
         continue;
       }
-      const candidate = { question: data.question, answer: ansNum, answerRaw: data.answer_latex || String(data.answer) };
+      const candidate = {
+        question: normalizeLatex(data.question),
+        answer: ansNum,
+        answerRaw: normalizeLatex(data.answer_latex || String(data.answer))
+      };
 
       if (!taskTypeAllowed(candidate.question, ch.topic || ch.title)) {
         prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip. Uporabi SAMO tip, ki ustreza temi "${ch.topic || ch.title}".`;
@@ -781,7 +783,11 @@ Vrni izključno JSON:
       const response = await callAI(prompt);
       const data = JSON.parse(response.choices[0].message.content);
       const ansNum = typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer);
-      finalData = { question: data.question, answer: ansNum, answerRaw: data.answer_latex || String(data.answer) };
+      finalData = {
+        question: normalizeLatex(data.question),
+        answer: ansNum,
+        answerRaw: normalizeLatex(data.answer_latex || String(data.answer))
+      };
     }
 
     sess.currentTask = {
@@ -925,22 +931,22 @@ RAZLAGA MORA BITI:
 - Brez težkih besed, brez teorije, brez uvodov.
 - Uporabi POSTOPEK, ki se uporablja v slovenskih šolah pri tej temi.
 - Osredotoči se na tisto, kar bo učencu pomagalo pri NASLEDNJI podobni nalogi.
-- Uporabi LaTeX za matematične izraze.
+- Uporabi LaTeX za matematične izraze (en backslash pred \\frac).
 - Zadnja alineja naj bo pravilen rezultat v obliki: "Rezultat: <latex>".
 
 Vrni JSON: { "steps": ["korak 1", "korak 2", "Rezultat: ..."] }`;
       const response = await callAI(prompt);
       const data = JSON.parse(response.choices[0].message.content);
-      steps = Array.isArray(data.steps) ? data.steps : [];
+      steps = Array.isArray(data.steps) ? data.steps.map(normalizeLatex) : [];
     } catch (e) {
-      steps = ['Rezultat: ' + (sess.currentTask.answerRaw || sess.currentTask.answer)];
+      steps = ['Rezultat: ' + normalizeLatex(sess.currentTask.answerRaw || sess.currentTask.answer)];
     }
     sess.awaitingNext = true; saveData();
     return res.json({
       correct: false, finished: false,
       correctCount: sess.correct, target: 5,
       correctAnswer: sess.currentTask.answer,
-      correctAnswerRaw: sess.currentTask.answerRaw,
+      correctAnswerRaw: normalizeLatex(sess.currentTask.answerRaw || ''),
       steps: steps,
       message: 'Ni pravilno. Preberi kratko razlago in nato klikni "Poskusi s podobno nalogo".'
     });
@@ -1133,10 +1139,13 @@ app.get('/api/student-detail/:username', requireAdmin, (req, res) => {
    ============================================================ */
 const PORT = process.env.PORT || 3001;
 
+app.listen(PORT, () => {
+  console.log(`✅ Strežnik: http://localhost:${PORT}`);
+  console.log(`   🤖 AI: Groq (${GROQ_MODEL})`);
+});
+
 connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`✅ Strežnik: http://localhost:${PORT}`);
-    console.log(`   Odpri http://localhost:${PORT}/index.html`);
-    console.log(`   🤖 AI: Groq (${GROQ_MODEL})`);
-  });
+  console.log('✅ Baza pripravljena.');
+}).catch(err => {
+  console.error('❌ Baza ni uspela:', err.message);
 });
