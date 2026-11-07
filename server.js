@@ -40,6 +40,7 @@ function normalizeLatex(s) {
   return t;
 }
 
+// Pretvori uporabniški odgovor v število (podpira 1/2, 0,5, 0.5, -3, +7, 3/4)
 function parseNumberString(raw) {
   if (raw === null || raw === undefined) return NaN;
   let s = String(raw).trim().replace(/\s+/g, '').replace(',', '.');
@@ -52,6 +53,15 @@ function parseNumberString(raw) {
   }
   const n = parseFloat(s);
   return isNaN(n) ? NaN : n;
+}
+
+// Preveri, ali sta dve števili enaki (s toleranco)
+function numbersEqual(a, b, tolerance = 1e-9) {
+  if (isNaN(a) || isNaN(b)) return false;
+  const diff = Math.abs(a - b);
+  // relativna toleranca za velika števila + absolutna za majhna
+  const scale = Math.max(Math.abs(a), Math.abs(b), 1);
+  return diff <= tolerance * scale;
 }
 
 function extractNumbers(text) {
@@ -122,6 +132,17 @@ function generatePassword() {
   let p = '';
   for (let i = 0; i < 6; i++) p += chars[Math.floor(Math.random() * chars.length)];
   return p;
+}
+
+/* ============================================================
+   ZDRUŽI TEMA SKLOPA (title + instructions + staro topic)
+   ============================================================ */
+function chapterTopicText(ch) {
+  const parts = [];
+  if (ch.title) parts.push(ch.title);
+  if (ch.topic) parts.push(ch.topic);
+  if (ch.instructions) parts.push(ch.instructions);
+  return parts.join(' ').trim();
 }
 
 /* ============================================================
@@ -309,17 +330,6 @@ function strictLevelRules(grade, topic) {
     4: 'trimestna števila, dve operaciji.',
     5: 'besedilna naloga.'
   };
-}
-
-function levelDescriptionsForGrade(grade) {
-  const base = {
-    6: ['zelo enostavna naloga za 6. razred', 'enostavna naloga za 6. razred', 'srednje zahtevna naloga za 6. razred', 'zahtevnejša naloga za 6. razred', 'najzahtevnejša naloga za 6. razred'],
-    7: ['zelo enostavna naloga za 7. razred', 'enostavna naloga za 7. razred', 'srednje zahtevna naloga za 7. razred', 'zahtevnejša naloga za 7. razred', 'najzahtevnejša naloga za 7. razred'],
-    8: ['zelo enostavna naloga za 8. razred', 'enostavna naloga za 8. razred', 'srednje zahtevna naloga za 8. razred', 'zahtevnejša naloga za 8. razred', 'najzahtevnejša naloga za 8. razred'],
-    9: ['zelo enostavna naloga za 9. razred', 'enostavna naloga za 9. razred', 'srednje zahtevna naloga za 9. razred', 'zahtevnejša naloga za 9. razred', 'najzahtevnejša naloga za 9. razred']
-  };
-  const arr = base[grade] || base[8];
-  return { 1: arr[0], 2: arr[1], 3: arr[2], 4: arr[3], 5: arr[4] };
 }
 
 function taskTypeAllowed(question, topic) {
@@ -593,7 +603,7 @@ app.get('/api/chapters/:id', (req, res) => {
 });
 
 app.post('/api/chapters', requireAdmin, async (req, res) => {
-  const { title, instructions, type, grade, category, deadline, topic } = req.body || {};
+  const { title, instructions, type, grade, category, deadline } = req.body || {};
   if (!title || !type || !grade || !category) return res.status(400).json({ error: 'Manjka polje.' });
   if (category === 'domaca' && !deadline) return res.status(400).json({ error: 'Za domačo rok obvezen.' });
   const ch = {
@@ -604,7 +614,6 @@ app.post('/api/chapters', requireAdmin, async (req, res) => {
     grade: parseInt(grade, 10),
     category,
     deadline: deadline || null,
-    topic: topic || null,
     createdAt: Date.now()
   };
   DATA.chapters.push(ch);
@@ -615,14 +624,13 @@ app.post('/api/chapters', requireAdmin, async (req, res) => {
 app.put('/api/chapters/:id', requireAdmin, async (req, res) => {
   const ch = DATA.chapters.find(c => c.id === req.params.id);
   if (!ch) return res.status(404).json({ error: 'Poglavje ne obstaja.' });
-  const { title, instructions, type, grade, category, deadline, topic } = req.body || {};
+  const { title, instructions, type, grade, category, deadline } = req.body || {};
   if (title !== undefined) ch.title = title;
   if (instructions !== undefined) ch.instructions = instructions;
   if (type !== undefined) ch.type = type;
   if (grade !== undefined) ch.grade = parseInt(grade, 10);
   if (category !== undefined) ch.category = category;
   if (deadline !== undefined) ch.deadline = deadline || null;
-  if (topic !== undefined) ch.topic = topic;
   await saveData();
   res.json(ch);
 });
@@ -709,14 +717,15 @@ app.post('/api/generate-task', async (req, res) => {
 
   const level = sess.level;
   const grade = ch.grade;
-  const topicLower = (ch.topic || ch.title || '').toLowerCase();
+  const topicText = chapterTopicText(ch);
+  const topicLower = topicText.toLowerCase();
   const isGeometry = topicLower.includes('geometr') || topicLower.includes('pitagor') ||
                      topicLower.includes('krog') || topicLower.includes('kot') ||
                      topicLower.includes('trikot') || topicLower.includes('lik') ||
                      topicLower.includes('telo') || topicLower.includes('koordinat') ||
                      topicLower.includes('obseg') || topicLower.includes('ploščin');
 
-  const strictRules = strictLevelRules(grade, ch.topic || ch.title);
+  const strictRules = strictLevelRules(grade, topicText);
   const levelDesc = strictRules[level] || strictRules[3];
   const seed = username + '_' + Date.now() + '_' + Math.random();
 
@@ -747,11 +756,10 @@ app.post('/api/generate-task', async (req, res) => {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
   }
 
-  // Sistemsko sporočilo – z morebitnimi navodili učitelja
   let systemMessage = `Si matematični tutor za slovenske osnovnošolce. Generiraš natanko eno matematično nalogo.
 
 RAZRED: ${grade}
-TEMA SKLOPA: "${ch.topic || ch.title}"
+TEMA SKLOPA: "${topicText}"
 
 Naloga MORA biti izključno iz te teme in iz snovi ${grade}. razreda.
 Ne uporabljaj matematičnih orodij, ki niso del teme (npr. Pitagorovega izreka, če tema ni Pitagorov izrek).
@@ -763,7 +771,7 @@ Vrni izključno JSON.`;
     systemMessage += `\n\n⚠️⚠️ UKAZ UČITELJA (ima prednost pred vsemi drugimi pravili):\n${String(ch.instructions).trim()}\n\nUpoštevaj ta ukaz do črke natančno. Če ukaz zahteva določen tip naloge (npr. trikotnik), NE uporabi drugega lika (npr. pravokotnika).`;
   }
 
-  let prompt = `Tema: "${ch.topic || ch.title}"
+  let prompt = `Tema: "${topicText}"
 Razred: ${grade}
 Raven: ${level}/5 – ${levelDesc}
 Kategorija: ${ch.category === 'domaca' ? 'domača naloga' : 'utrjevanje'}
@@ -840,7 +848,7 @@ Vrni JSON:
 
       const questionSanitized = normalizeLatex(data.question);
 
-      if (!taskTypeAllowed(questionSanitized, ch.topic || ch.title)) {
+      if (!taskTypeAllowed(questionSanitized, topicText)) {
         prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip.`;
         continue;
       }
@@ -919,6 +927,8 @@ Vrni JSON:
 
 /* ============================================================
    API: PREVERJANJE
+   – Preproste odgovore preveri JS lokalno.
+   – AI se kliče SAMO, če odgovora ni mogoče pretvoriti v število.
    ============================================================ */
 app.post('/api/check-answer', async (req, res) => {
   const { username, userAnswers } = req.body || {};
@@ -952,16 +962,24 @@ app.post('/api/check-answer', async (req, res) => {
 
   let allCorrect = true;
   const perAnswer = [];
+  let aiCalls = 0;
+
   for (let i = 0; i < expected.length; i++) {
     const exp = expected[i];
     const rawUser = (Array.isArray(userAnswers) && userAnswers[i] !== undefined)
       ? userAnswers[i]
       : '';
-    let userNum = parseNumberString(rawUser);
+
     let ok = false;
+    const userNum = parseNumberString(rawUser);
+
+    // 1) PREPROSTO PREVERJANJE Z JS
     if (!isNaN(userNum)) {
-      ok = Math.abs(userNum - exp.value) < 1e-9;
+      ok = numbersEqual(userNum, exp.value, 1e-9);
+      // če je številka, NE kličemo AI
     } else if (String(rawUser).trim() !== '') {
+      // 2) AI – SAMO za odgovore, ki niso številke (npr. "pol", "tri četrt")
+      aiCalls++;
       try {
         const prompt = `Si matematični tutor. Učenec je odgovoril na nalogo:
 NALOGA: ${sess.currentTask.question}
@@ -977,7 +995,10 @@ Vrni JSON: { "is_correct": true/false }`;
       } catch (e) {
         ok = false;
       }
+    } else {
+      ok = false;
     }
+
     if (!ok) allCorrect = false;
     perAnswer.push({ label: exp.label, ok });
   }
@@ -1009,7 +1030,7 @@ Vrni JSON: { "is_correct": true/false }`;
   if (!st.byType[t]) st.byType[t] = { total: 0, correct: 0 };
   st.byType[t].total++;
   if (allCorrect) st.byType[t].correct++;
-  st.history.push({ ts: Date.now(), question: sess.currentTask.question, ok: allCorrect, attempt: sess.attempts, level: sess.currentTask.level });
+  st.history.push({ ts: Date.now(), question: sess.currentTask.question, ok: allCorrect, attempt: sess.attempts, level: sess.currentTask.level, aiCalls: aiCalls });
   if (st.history.length > 300) st.history = st.history.slice(-300);
   await saveData();
 
@@ -1020,7 +1041,8 @@ Vrni JSON: { "is_correct": true/false }`;
       return res.json({
         correct: true, finished: true,
         correctCount: sess.correct, attempts: sess.attempts,
-        message: 'Bravo! Rešil si vseh 5 nalog. 🎉'
+        message: 'Bravo! Rešil si vseh 5 nalog. 🎉',
+        aiCalls: aiCalls
       });
     }
     sess.level = Math.min(5, sess.level + 1);
@@ -1028,7 +1050,8 @@ Vrni JSON: { "is_correct": true/false }`;
     return res.json({
       correct: true, finished: false,
       correctCount: sess.correct, target: 5, nextLevel: sess.level,
-      message: 'Odlično! Pravilno.'
+      message: 'Odlično! Pravilno.',
+      aiCalls: aiCalls
     });
   } else {
     let steps = [];
@@ -1062,7 +1085,8 @@ Vrni JSON: { "steps": ["korak 1", "korak 2", "Rezultat: ..."] }`;
       correctAnswers: expected.map(e => ({ label: e.label, value: e.value, latex: e.latex })),
       perAnswer: perAnswer,
       steps: steps,
-      message: 'Ni pravilno. Preberi kratko razlago in nato klikni "Poskusi s podobno nalogo".'
+      message: 'Ni pravilno. Preberi kratko razlago in nato klikni "Poskusi s podobno nalogo".',
+      aiCalls: aiCalls
     });
   }
 });
