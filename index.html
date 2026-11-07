@@ -16,6 +16,8 @@
   };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraph.css" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -101,6 +103,11 @@
     line-height: 1.6; text-align: center; min-height: 40px;
   }
   .task-text .mjx-container { font-size: 140% !important; }
+  .sketch-box {
+    background: white; border-radius: 10px; padding: 10px;
+    margin-bottom: 16px; min-height: 320px;
+  }
+  .sketch-box .jxgbox { width: 100%; height: 300px; }
   .feedback { margin-top: 12px; font-size: 15px; line-height: 1.6; min-height: 22px; }
   .feedback.correct { color: #27ae60; font-weight: 600; }
   .feedback.wrong { color: #e74c3c; font-weight: 600; }
@@ -348,7 +355,7 @@
         <option value="utrjevanje">Utrjevanje (vedno odprto)</option>
       </select>
       <input id="newChapterDeadline" type="datetime-local">
-      <input id="newChapterTopic" placeholder="Tema za LLM (npr. Seštevanje ulomkov)">
+      <input id="newChapterTopic" placeholder="Tema za LLM (npr. Pitagorov izrek, Ulomki)">
       <button class="secondary" onclick="addChapter()">+ Dodaj sklop</button>
       <div class="error" id="chapterError" style="margin-top:8px;"></div>
 
@@ -431,6 +438,9 @@
     </div>
     <div class="task-box">
       <div class="task-text" id="taskText"></div>
+      <div id="sketchContainer" class="sketch-box hidden">
+        <div id="jxgbox" class="jxgbox"></div>
+      </div>
       <div class="row">
         <input id="answerInput" placeholder="Vpiši odgovor." onkeydown="if(event.key==='Enter') checkAnswer()">
         <button style="width:auto; padding:12px 24px;" id="checkBtn" onclick="checkAnswer()">Preveri</button>
@@ -487,25 +497,23 @@ var allChapters = [];
 var currentDetailUsername = null;
 var studentsList = [];
 var editingStudentUsername = null;
+var currentBoard = null;
 
 function authHeaders() { return currentUser ? { 'x-admin-user': currentUser.username } : {}; }
 
 /* ============================================================
-   MATHJAX – varno izrisovanje z čakanjem na startup.promise
+   MATHJAX
    ============================================================ */
 function normalizeLatex(text) {
   if (!text) return text;
-  // Odstrani podvojene backslashe (\\frac -> \frac)
   return String(text).replace(/\\\\/g, '\\');
 }
 
 async function renderMath(el) {
   if (!el) return;
-  // Počakaj, da je MathJax pripravljen
   if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
     try { await MathJax.startup.promise; } catch (e) {}
   } else {
-    // Če MathJax še ni naložen, počakaj do 5 sekund
     let waited = 0;
     while ((!window.MathJax || !MathJax.startup || !MathJax.startup.promise) && waited < 5000) {
       await new Promise(r => setTimeout(r, 100));
@@ -513,7 +521,137 @@ async function renderMath(el) {
     }
   }
   if (!window.MathJax || !MathJax.typesetPromise) return;
-  try { await MathJax.typesetPromise([el]); } catch (e) { /* tiho */ }
+  try { await MathJax.typesetPromise([el]); } catch (e) {}
+}
+
+/* ============================================================
+   JSXGRAPH – risanje skic
+   ============================================================ */
+function clearSketch() {
+  document.getElementById('sketchContainer').classList.add('hidden');
+  if (currentBoard) {
+    try { JXG.JSXGraph.freeBoard(currentBoard); } catch (e) {}
+    currentBoard = null;
+  }
+  document.getElementById('jxgbox').innerHTML = '';
+}
+
+function renderSketch(sketch) {
+  clearSketch();
+  if (!sketch || !sketch.type) return;
+
+  var container = document.getElementById('sketchContainer');
+  container.classList.remove('hidden');
+  var box = document.getElementById('jxgbox');
+  box.innerHTML = '';
+
+  try {
+    var type = sketch.type;
+    var d = sketch.data || {};
+
+    if (type === 'right_triangle') {
+      var a = parseFloat(d.a) || 3;
+      var b = parseFloat(d.b) || 4;
+      var unit = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, Math.max(a, b) + 1, Math.max(a, b) + 2, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var A = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 3 });
+      var B = currentBoard.create('point', [b, 0], { name: 'B', fixed: true, size: 3 });
+      var C = currentBoard.create('point', [0, a], { name: 'C', fixed: true, size: 3 });
+      currentBoard.create('polygon', [A, B, C], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [b / 2, -0.6, 'b = ' + b + ' ' + unit], { fontSize: 13 });
+      currentBoard.create('text', [-1.2, a / 2, 'a = ' + a + ' ' + unit], { fontSize: 13 });
+      currentBoard.create('text', [b / 2, a / 2 + 0.5, 'c = ?'], { fontSize: 13 });
+    } else if (type === 'rectangle') {
+      var ra = parseFloat(d.a) || 5;
+      var rb = parseFloat(d.b) || 3;
+      var ru = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, ra + 1, rb + 1, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var P1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
+      var P2 = currentBoard.create('point', [rb, 0], { name: '', fixed: true, visible: false });
+      var P3 = currentBoard.create('point', [rb, ra], { name: '', fixed: true, visible: false });
+      var P4 = currentBoard.create('point', [0, ra], { name: '', fixed: true, visible: false });
+      currentBoard.create('polygon', [P1, P2, P3, P4], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [rb / 2, -0.6, 'b = ' + rb + ' ' + ru], { fontSize: 13 });
+      currentBoard.create('text', [-1.2, ra / 2, 'a = ' + ra + ' ' + ru], { fontSize: 13 });
+    } else if (type === 'square') {
+      var sa = parseFloat(d.a) || 4;
+      var su = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, sa + 1, sa + 1, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var S1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
+      var S2 = currentBoard.create('point', [sa, 0], { name: '', fixed: true, visible: false });
+      var S3 = currentBoard.create('point', [sa, sa], { name: '', fixed: true, visible: false });
+      var S4 = currentBoard.create('point', [0, sa], { name: '', fixed: true, visible: false });
+      currentBoard.create('polygon', [S1, S2, S3, S4], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [sa / 2, -0.6, 'a = ' + sa + ' ' + su], { fontSize: 13 });
+    } else if (type === 'circle') {
+      var r = parseFloat(d.r) || 5;
+      var cu = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-r - 1, r + 1, r + 1, -r - 1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var S = currentBoard.create('point', [0, 0], { name: 'S', fixed: true, size: 3 });
+      currentBoard.create('circle', [S, r], {
+        strokeColor: '#667eea', strokeWidth: 2, fillColor: '#eef0fa', fillOpacity: 0.3
+      });
+      currentBoard.create('segment', [S, [r, 0]], { strokeColor: '#e74c3c', strokeWidth: 2, dash: 2 });
+      currentBoard.create('text', [r / 2, 0.4, 'r = ' + r + ' ' + cu], { fontSize: 13 });
+    } else if (type === 'triangle') {
+      var ta = parseFloat(d.a) || 5;
+      var tb = parseFloat(d.b) || 6;
+      var tc = parseFloat(d.c) || 7;
+      var tu = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, Math.max(ta, tb, tc) + 1, Math.max(ta, tb, tc) + 1, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var T1 = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 3 });
+      var T2 = currentBoard.create('point', [tc, 0], { name: 'B', fixed: true, size: 3 });
+      var T3 = currentBoard.create('point', [ta * 0.5, tb * 0.8], { name: 'C', fixed: true, size: 3 });
+      currentBoard.create('polygon', [T1, T2, T3], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [tc / 2, -0.6, 'c = ' + tc + ' ' + tu], { fontSize: 13 });
+    } else if (type === 'angle') {
+      var alpha = parseFloat(d.alpha) || 45;
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, 5, 6, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var V = currentBoard.create('point', [0, 0], { name: 'V', fixed: true, size: 3 });
+      var A = currentBoard.create('point', [5, 0], { name: 'A', fixed: true, size: 3 });
+      var B = currentBoard.create('point', [5 * Math.cos(alpha * Math.PI / 180), 5 * Math.sin(alpha * Math.PI / 180)], { name: 'B', fixed: true, size: 3 });
+      currentBoard.create('segment', [V, A], { strokeColor: '#667eea', strokeWidth: 2 });
+      currentBoard.create('segment', [V, B], { strokeColor: '#667eea', strokeWidth: 2 });
+      currentBoard.create('text', [2.5, -0.6, 'α = ' + alpha + '°'], { fontSize: 13 });
+    }
+  } catch (e) {
+    console.warn('Napaka pri risanju skice:', e);
+    clearSketch();
+  }
 }
 
 /* ============================================================
@@ -542,6 +680,7 @@ function logout() {
   currentUser = null; currentGrade = null; currentCategory = null;
   currentChapter = null; currentTask = null; allChapters = [];
   currentDetailUsername = null; studentsList = []; editingStudentUsername = null;
+  clearSketch();
   document.getElementById('loginUser').value = '';
   document.getElementById('loginPass').value = '';
   document.getElementById('loginView').classList.remove('hidden');
@@ -563,6 +702,7 @@ function showStudentHome() {
 function backToStudentHome() {
   ['studentChaptersView','tutorView','studentAnalysisView'].forEach(id => document.getElementById(id).classList.add('hidden'));
   document.getElementById('studentHomeView').classList.remove('hidden');
+  clearSketch();
 }
 function openCategory(cat) {
   currentCategory = cat;
@@ -598,6 +738,7 @@ function renderStudentChapterList() {
 function backToStudentList() {
   document.getElementById('tutorView').classList.add('hidden');
   document.getElementById('studentChaptersView').classList.remove('hidden');
+  clearSketch();
 }
 
 /* ============================================================
@@ -619,6 +760,7 @@ function openChapter(ch) {
   document.getElementById('checkBtn').style.display = '';
   document.getElementById('taskText').innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam ...</span>';
   document.getElementById('resumeBanner').classList.add('hidden');
+  clearSketch();
 
   if (ch.type === 'llm' || ch.type === 'cela_stevila') startOrResumeSession(ch);
   else document.getElementById('taskText').textContent = 'Za to poglavje tutor še ni na voljo.';
@@ -635,10 +777,16 @@ function startOrResumeSession(ch) {
       llmState.correct = data.correct || 0;
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
       if (data.hasCurrentTask && data.currentTask) {
-        currentTask = { question: normalizeLatex(data.currentTask.question), text: normalizeLatex(data.currentTask.question), level: data.currentTask.level };
+        currentTask = {
+          question: normalizeLatex(data.currentTask.question),
+          text: normalizeLatex(data.currentTask.question),
+          level: data.currentTask.level,
+          sketch: data.currentTask.sketch
+        };
         var tt = document.getElementById('taskText');
         tt.textContent = currentTask.question;
         renderMath(tt);
+        if (currentTask.sketch) renderSketch(currentTask.sketch);
         var banner = document.getElementById('resumeBanner');
         banner.textContent = '↩️ Nadaljuješ, kjer si končal. Pravilnih: ' + data.correct + '/5, raven: ' + data.level + '/5.';
         banner.classList.remove('hidden');
@@ -674,6 +822,7 @@ function loadLLMTask(isRetry) {
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('answerInput').disabled = true;
+  clearSketch();
 
   fetch('/api/generate-task', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -683,12 +832,18 @@ function loadLLMTask(isRetry) {
     .then(data => {
       if (data.error) { tt.textContent = 'Napaka: ' + data.error; return; }
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
-      currentTask = { question: normalizeLatex(data.question), text: normalizeLatex(data.question), level: data.level };
+      currentTask = {
+        question: normalizeLatex(data.question),
+        text: normalizeLatex(data.question),
+        level: data.level,
+        sketch: data.sketch
+      };
       llmState.level = data.level;
       llmState.correct = data.correct;
       llmState.awaitingNext = false;
       tt.textContent = currentTask.question;
       renderMath(tt);
+      if (currentTask.sketch) renderSketch(currentTask.sketch);
       var inp = document.getElementById('answerInput');
       inp.value = ''; inp.disabled = false;
       document.getElementById('checkBtn').disabled = false;
@@ -705,6 +860,7 @@ function showLLMFinished(correct, attempts) {
   document.getElementById('answerInput').disabled = true;
   document.getElementById('checkBtn').style.display = 'none';
   document.getElementById('retryBtn').style.display = 'none';
+  clearSketch();
   document.getElementById('explanationBox').innerHTML =
     '<div style="text-align:center;margin-top:15px;">' +
     '<button class="secondary" onclick="startFresh()">Nova seja</button></div>';
