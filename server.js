@@ -113,6 +113,48 @@ function isTooSimilar(newTask, recentTasks) {
   return false;
 }
 
+/* ============================================================
+   PREVERJANJE PODVAJANJA MED SKICO IN BESEDILOM
+   ============================================================ */
+function textHasNumbers(text) {
+  if (!text) return false;
+  // Odstrani morebitno zaporedno številko vprašanja "1."
+  const cleaned = String(text).replace(/^\s*\d+[.)]\s*/, '');
+  return /-?\d+(?:[.,]\d+)?/.test(cleaned);
+}
+
+function sketchHasNumbers(sketch) {
+  if (!sketch || typeof sketch !== 'object') return false;
+  const data = sketch.data || {};
+  for (const key of Object.keys(data)) {
+    if (key === 'unit') continue; // enota (cm, °) ni podatek
+    const v = data[key];
+    if (typeof v === 'number' && !isNaN(v)) return true;
+    if (typeof v === 'string' && /-?\d+(?:[.,]\d+)?/.test(v)) return true;
+  }
+  return false;
+}
+
+function hasSketchData(sketch) {
+  if (!sketch || !sketch.type) return false;
+  return true;
+}
+
+/**
+ * Preveri, ali se podatki med skico in besedilom podvajajo.
+ * Vrne true, če je OK; false, če se podvaja.
+ */
+function sketchTextConsistent(question, sketch) {
+  const hasText = textHasNumbers(question);
+  const hasSketch = hasSketchData(sketch);
+  const sketchNums = hasSketch && sketchHasNumbers(sketch);
+
+  if (!hasSketch) return true;
+  if (!hasText) return true;
+  if (sketchNums && hasText) return false;
+  return true;
+}
+
 function slug(s) {
   return String(s).toLowerCase()
     .replace(/[čć]/g, 'c').replace(/[š]/g, 's').replace(/[ž]/g, 'z').replace(/[đ]/g, 'd')
@@ -137,7 +179,10 @@ function generatePassword() {
 function chapterTopicText(ch) {
   const parts = [];
   if (ch.title) parts.push(ch.title);
-  if (ch.instructions) parts.push(ch.instructions);
+  // Interna navodila za Groq (niso vidna učencem)
+  if (ch.llmPrompt) parts.push(ch.llmPrompt);
+  // Za nazaj kompatibilnost s starimi sklopi, kjer je bil instructions uporabljen kot prompt
+  else if (ch.instructions) parts.push(ch.instructions);
   return parts.join(' ').trim();
 }
 
@@ -432,6 +477,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function isAdminRequest(req) {
+  const adminUsername = req.headers['x-admin-user'] || (req.body && req.body._admin) || req.query['x-admin-user'];
+  return !!(adminUsername && DATA.users[adminUsername] && DATA.users[adminUsername].role === 'admin');
+}
+
 app.get('/api/students', requireAdmin, (req, res) => {
   const list = Object.keys(DATA.users)
     .filter(u => DATA.users[u].role === 'student')
@@ -588,24 +638,40 @@ app.get('/api/students/pdf/:grade', requireAdmin, (req, res) => {
    ============================================================ */
 app.get('/api/chapters', (req, res) => {
   const grade = req.query.grade ? parseInt(req.query.grade, 10) : null;
-  if (grade) return res.json(DATA.chapters.filter(c => c.grade === grade));
-  res.json(DATA.chapters);
+  const admin = isAdminRequest(req);
+
+  let list = DATA.chapters;
+  if (grade) list = list.filter(c => c.grade === grade);
+
+  // Za učence odstrani skrita polja (llmPrompt)
+  if (!admin) {
+    list = list.map(c => {
+      const copy = Object.assign({}, c);
+      delete copy.llmPrompt;
+      return copy;
+    });
+  }
+  res.json(list);
 });
 
 app.get('/api/chapters/:id', (req, res) => {
   const ch = DATA.chapters.find(c => c.id === req.params.id);
   if (!ch) return res.status(404).json({ error: 'Poglavje ne obstaja.' });
-  res.json(ch);
+  if (isAdminRequest(req)) return res.json(ch);
+  const copy = Object.assign({}, ch);
+  delete copy.llmPrompt;
+  res.json(copy);
 });
 
 app.post('/api/chapters', requireAdmin, async (req, res) => {
-  const { title, instructions, type, grade, category, deadline } = req.body || {};
+  const { title, instructions, llmPrompt, type, grade, category, deadline } = req.body || {};
   if (!title || !type || !grade || !category) return res.status(400).json({ error: 'Manjka polje.' });
   if (category === 'domaca' && !deadline) return res.status(400).json({ error: 'Za domačo rok obvezen.' });
   const ch = {
     id: 'ch_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
     title,
-    instructions: instructions || '',
+    instructions: instructions || '',   // VIDNO učencem (kratek opis)
+    llmPrompt: llmPrompt || '',          // SKRITO – samo za Groq
     type,
     grade: parseInt(grade, 10),
     category,
@@ -620,9 +686,10 @@ app.post('/api/chapters', requireAdmin, async (req, res) => {
 app.put('/api/chapters/:id', requireAdmin, async (req, res) => {
   const ch = DATA.chapters.find(c => c.id === req.params.id);
   if (!ch) return res.status(404).json({ error: 'Poglavje ne obstaja.' });
-  const { title, instructions, type, grade, category, deadline } = req.body || {};
+  const { title, instructions, llmPrompt, type, grade, category, deadline } = req.body || {};
   if (title !== undefined) ch.title = title;
   if (instructions !== undefined) ch.instructions = instructions;
+  if (llmPrompt !== undefined) ch.llmPrompt = llmPrompt;
   if (type !== undefined) ch.type = type;
   if (grade !== undefined) ch.grade = parseInt(grade, 10);
   if (category !== undefined) ch.category = category;
@@ -748,10 +815,11 @@ app.post('/api/generate-task', async (req, res) => {
   * {"type":"angle","data":{"alpha":45,"beta":60,"unit":"°"}}
 - Če skica ni smiselna, vrni "sketch": null.
 
-⚠️ POMEMBNO – BREZ PODVAJANJA:
-- Če so podatki (npr. dolžine stranic) prikazani na skici, jih NE ponavljaj v besedilu naloge.
-- Če so podatki v besedilu naloge, jih NE prikazuj na skici.
-- Skica in besedilo se dopolnjujeta, ne podvajata.
+⚠️⚠️ STROGO PRAVILO – BREZ PODVAJANJA:
+- Podatki so lahko SAMO na enem mestu: ali v besedilu ALI na skici.
+- Če so podatki (npr. dolžine stranic) prikazani na skici, jih besedilo naloge NE sme ponovno navajati. Besedilo naj vsebuje le vprašanje (npr. "Izračunaj obseg.").
+- Če so podatki v besedilu naloge, skica NE sme vsebovati nobenih številk ali oznak z merami. Skica naj prikaže le obliko brez mer (npr. trikotnik brez oznak a=5).
+- Nikoli ne ponavljaj istih številk v obeh delih naloge.
 `;
   } else {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
@@ -768,8 +836,12 @@ Naloga naj bo rešljiva SAMO z znanjem te teme.
 
 Vrni izključno JSON.`;
 
-  if (ch.instructions && String(ch.instructions).trim() !== '') {
-    systemMessage += `\n\n⚠️⚠️ UKAZ UČITELJA (ima prednost pred vsemi drugimi pravili):\n${String(ch.instructions).trim()}\n\nUpoštevaj ta ukaz do črke natančno. Če ukaz zahteva določen tip naloge (npr. trikotnik), NE uporabi drugega lika (npr. pravokotnika).`;
+  // Interna navodila za Groq – NISO vidna učencem
+  const internalPrompt = (ch.llmPrompt && String(ch.llmPrompt).trim() !== '')
+    ? String(ch.llmPrompt).trim()
+    : (ch.instructions && String(ch.instructions).trim() !== '' ? String(ch.instructions).trim() : '');
+  if (internalPrompt) {
+    systemMessage += `\n\n⚠️⚠️ UKAZ UČITELJA (ima prednost pred vsemi drugimi pravili):\n${internalPrompt}\n\nUpoštevaj ta ukaz do črke natančno. Če ukaz zahteva določen tip naloge (npr. trikotnik), NE uporabi drugega lika (npr. pravokotnika).`;
   }
 
   let prompt = `Tema: "${topicText}"
@@ -855,6 +927,11 @@ Vrni JSON:
       }
       if (isTooSimilar({ question: questionSanitized }, recent.slice(-10))) {
         prompt += `\n\nOPOZORILO: Prejšnji poskus je bil preveč podoben. Uporabi drugačna števila.`;
+        continue;
+      }
+      // NOVO: preveri podvajanje med skico in besedilom
+      if (!sketchTextConsistent(questionSanitized, data.sketch)) {
+        prompt += `\n\nOPOZORILO: Podatki se podvajajo med skico in besedilom. Če so številke na skici, jih NE ponavljaj v besedilu. Če so številke v besedilu, skica NE sme imeti oznak s številkami (npr. "a = 5 cm"). Skica naj prikaže le obliko brez mer.`;
         continue;
       }
 
