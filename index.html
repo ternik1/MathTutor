@@ -232,6 +232,11 @@
   .modal-box h3 { margin-bottom: 16px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
   .modal-actions button { flex: 1; }
+  .answer-block { margin-bottom: 10px; }
+  .answer-block label {
+    display: block; font-size: 13px; color: #666;
+    margin-bottom: 4px; font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -441,8 +446,8 @@
       <div id="sketchContainer" class="sketch-box hidden">
         <div id="jxgbox" class="jxgbox"></div>
       </div>
-      <div class="row">
-        <input id="answerInput" placeholder="Vpiši odgovor." onkeydown="if(event.key==='Enter') checkAnswer()">
+      <div id="answersContainer"></div>
+      <div class="btn-row" style="margin-top:12px;">
         <button style="width:auto; padding:12px 24px;" id="checkBtn" onclick="checkAnswer()">Preveri</button>
       </div>
       <div class="feedback" id="feedback"></div>
@@ -754,8 +759,7 @@ function openChapter(ch) {
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('retryBtn').style.display = 'none';
-  document.getElementById('answerInput').disabled = true;
-  document.getElementById('answerInput').value = '';
+  document.getElementById('answersContainer').innerHTML = '';
   document.getElementById('checkBtn').disabled = true;
   document.getElementById('checkBtn').style.display = '';
   document.getElementById('taskText').innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam ...</span>';
@@ -781,25 +785,25 @@ function startOrResumeSession(ch) {
           question: normalizeLatex(data.currentTask.question),
           text: normalizeLatex(data.currentTask.question),
           level: data.currentTask.level,
-          sketch: data.currentTask.sketch
+          sketch: data.currentTask.sketch,
+          answers: data.currentTask.answers
         };
         var tt = document.getElementById('taskText');
         tt.textContent = currentTask.question;
         renderMath(tt);
         if (currentTask.sketch) renderSketch(currentTask.sketch);
+        renderAnswerFields(currentTask.answers);
         var banner = document.getElementById('resumeBanner');
         banner.textContent = '↩️ Nadaljuješ, kjer si končal. Pravilnih: ' + data.correct + '/5, raven: ' + data.level + '/5.';
         banner.classList.remove('hidden');
         if (data.currentTask.awaitingNext) {
-          document.getElementById('answerInput').disabled = true;
+          document.getElementById('answersContainer').querySelectorAll('input').forEach(i => i.disabled = true);
           document.getElementById('checkBtn').disabled = true;
           document.getElementById('checkBtn').style.display = 'none';
           document.getElementById('retryBtn').style.display = '';
         } else {
-          document.getElementById('answerInput').disabled = false;
           document.getElementById('checkBtn').disabled = false;
           document.getElementById('checkBtn').style.display = '';
-          document.getElementById('answerInput').focus();
         }
         updateProgressUI_LLM();
       } else {
@@ -812,16 +816,40 @@ function updateProgressUI_LLM() {
   document.getElementById('progressTasks').textContent = 'Pravilnih: ' + llmState.correct + ' / 5  •  Raven: ' + llmState.level + ' / 5';
   document.getElementById('progressStats').textContent = currentChapter.title;
 }
+function renderAnswerFields(answers) {
+  var cont = document.getElementById('answersContainer');
+  cont.innerHTML = '';
+  if (!Array.isArray(answers) || !answers.length) {
+    answers = [{ label: 'Odgovor', value: 0, latex: '' }];
+  }
+  answers.forEach(function (a) {
+    var wrap = document.createElement('div');
+    wrap.className = 'answer-block';
+    var lbl = document.createElement('label');
+    lbl.textContent = a.label || 'Odgovor';
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'answer-field';
+    inp.placeholder = 'Vpiši ' + (a.label || 'odgovor').toLowerCase();
+    inp.style.marginBottom = '0';
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') checkAnswer(); });
+    wrap.appendChild(lbl);
+    wrap.appendChild(inp);
+    cont.appendChild(wrap);
+  });
+  var first = cont.querySelector('.answer-field');
+  if (first) first.focus();
+}
 function loadLLMTask(isRetry) {
   var tt = document.getElementById('taskText');
   tt.innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam tvojo nalogo ...</span>';
+  document.getElementById('answersContainer').innerHTML = '';
   document.getElementById('checkBtn').disabled = true;
   document.getElementById('checkBtn').style.display = '';
   document.getElementById('retryBtn').style.display = 'none';
   document.getElementById('explanationBox').innerHTML = '';
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
-  document.getElementById('answerInput').disabled = true;
   clearSketch();
 
   fetch('/api/generate-task', {
@@ -836,7 +864,8 @@ function loadLLMTask(isRetry) {
         question: normalizeLatex(data.question),
         text: normalizeLatex(data.question),
         level: data.level,
-        sketch: data.sketch
+        sketch: data.sketch,
+        answers: data.answers
       };
       llmState.level = data.level;
       llmState.correct = data.correct;
@@ -844,11 +873,9 @@ function loadLLMTask(isRetry) {
       tt.textContent = currentTask.question;
       renderMath(tt);
       if (currentTask.sketch) renderSketch(currentTask.sketch);
-      var inp = document.getElementById('answerInput');
-      inp.value = ''; inp.disabled = false;
+      renderAnswerFields(currentTask.answers);
       document.getElementById('checkBtn').disabled = false;
       document.getElementById('checkBtn').style.display = '';
-      inp.focus();
       updateProgressUI_LLM();
     })
     .catch(() => { tt.textContent = 'Napaka pri povezavi.'; });
@@ -857,7 +884,7 @@ function showLLMFinished(correct, attempts) {
   document.getElementById('taskText').textContent = '🎉 Bravo! Rešil si vseh 5 nalog!';
   document.getElementById('progressTasks').textContent = 'Seja zaključena';
   document.getElementById('progressStats').textContent = 'Pravilnih: ' + correct + ' / 5  •  Poskusov: ' + attempts;
-  document.getElementById('answerInput').disabled = true;
+  document.getElementById('answersContainer').innerHTML = '';
   document.getElementById('checkBtn').style.display = 'none';
   document.getElementById('retryBtn').style.display = 'none';
   clearSketch();
@@ -873,23 +900,29 @@ function startFresh() {
 }
 function checkAnswer() {
   if (!currentTask) return;
-  var inp = document.getElementById('answerInput');
-  var raw = inp.value.trim();
-  if (raw === '') {
+  var inputs = document.querySelectorAll('.answer-field');
+  var userAnswers = [];
+  var anyEmpty = false;
+  for (var i = 0; i < inputs.length; i++) {
+    var v = inputs[i].value.trim();
+    if (v === '') anyEmpty = true;
+    userAnswers.push(v);
+  }
+  if (anyEmpty) {
     document.getElementById('feedback').className = 'feedback wrong';
-    document.getElementById('feedback').textContent = 'Vnesi odgovor.';
+    document.getElementById('feedback').textContent = 'Vnesi vse odgovore.';
     return;
   }
   var fb = document.getElementById('feedback');
-  inp.disabled = true;
+  inputs.forEach(function (inp) { inp.disabled = true; });
   document.getElementById('checkBtn').disabled = true;
   document.getElementById('checkBtn').style.display = 'none';
   fb.className = 'feedback';
-  fb.innerHTML = '<span class="loading"><span class="spinner"></span>Preverjam tvoj odgovor ...</span>';
+  fb.innerHTML = '<span class="loading"><span class="spinner"></span>Preverjam tvoje odgovore ...</span>';
 
   fetch('/api/check-answer', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: currentUser.username, userAnswer: raw })
+    body: JSON.stringify({ username: currentUser.username, userAnswers: userAnswers })
   })
     .then(r => r.json())
     .then(data => {
@@ -916,10 +949,16 @@ function checkAnswer() {
           html += '<ol>';
           data.steps.forEach(s => { html += '<li>' + normalizeLatex(s) + '</li>'; });
           html += '</ol>';
-        } else {
-          html += '<p>Pravilen odgovor je ' + normalizeLatex(data.correctAnswerRaw || data.correctAnswer) + '.</p>';
         }
-        html += '<div class="correct-answer">Pravilen odgovor: ' + normalizeLatex(data.correctAnswerRaw || data.correctAnswer) + '</div>';
+        if (Array.isArray(data.correctAnswers)) {
+          html += '<div class="correct-answer">Pravilni odgovori:<br>';
+          data.correctAnswers.forEach(a => {
+            html += '<b>' + a.label + ':</b> ' + normalizeLatex(a.latex) + '<br>';
+          });
+          html += '</div>';
+        } else {
+          html += '<div class="correct-answer">Pravilen odgovor: ' + normalizeLatex(data.correctAnswerRaw || data.correctAnswer) + '</div>';
+        }
         html += '</div>';
         box.innerHTML = html;
         renderMath(box);
