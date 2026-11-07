@@ -220,7 +220,7 @@ function strictLevelRules(grade, topic) {
   const isPotence = t.includes('potenc') || t.includes('koren');
   const isOdstotki = t.includes('odstot');
   const isEnacbe = t.includes('enačb') || t.includes('enacb');
-  const isGeometrija = t.includes('geometr') || t.includes('pitagor') || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat');
+  const isGeometrija = t.includes('geometr') || t.includes('pitagor') || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat') || t.includes('obseg') || t.includes('ploščin') || t.includes('prostornin');
 
   if (isCelaStevila) {
     return {
@@ -366,7 +366,7 @@ async function callAI(prompt, maxAttempts = 6) {
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0.8,
-        max_tokens: 1000
+        max_tokens: 1100
       });
       if (r && r._response && r._response.headers) updateQuotaFromHeaders(r._response.headers);
       return r;
@@ -652,6 +652,7 @@ app.post('/api/start-session', (req, res) => {
     currentTask: sess.currentTask && !sess.finished ? {
       question: sess.currentTask.question,
       sketch: sess.currentTask.sketch || null,
+      answers: sess.currentTask.answers || null,
       level: sess.currentTask.level,
       awaitingNext: sess.awaitingNext
     } : null
@@ -693,7 +694,8 @@ app.post('/api/generate-task', async (req, res) => {
   const isGeometry = topicLower.includes('geometr') || topicLower.includes('pitagor') ||
                      topicLower.includes('krog') || topicLower.includes('kot') ||
                      topicLower.includes('trikot') || topicLower.includes('lik') ||
-                     topicLower.includes('telo') || topicLower.includes('koordinat');
+                     topicLower.includes('telo') || topicLower.includes('koordinat') ||
+                     topicLower.includes('obseg') || topicLower.includes('ploščin');
 
   const strictRules = strictLevelRules(grade, ch.topic || ch.title);
   const levelDesc = strictRules[level] || strictRules[3];
@@ -742,6 +744,12 @@ Raven: ${level}/5.
 
 ${sketchInstruction}
 
+⚠️ VEČ ODGOVOROV:
+- Če naloga zahteva več različnih izračunov (npr. "izračunaj obseg IN ploščino"), vrni v polju "answers" SEZNAM objektov, vsakega z "label", "value" in "latex".
+- Primer: [{"label":"Obseg","value":16,"latex":"16\\text{ cm}"},{"label":"Ploščina","value":15,"latex":"15\\text{ cm}^2"}]
+- Če naloga zahteva le en odgovor, vrni seznam z enim elementom.
+- Polji "answer" in "answer_latex" (za združljivost) naj vsebujeta PRVI odgovor iz seznama.
+
 ⚠️ STROGO PRAVILO O TIPU NALOGE:
 - Tip naloge mora ustrezati temi "${ch.topic || ch.title}".
 - Če tema vsebuje "cela števila", NE uporabi ulomkov ali decimalnih števil.
@@ -765,13 +773,14 @@ ${recentNumsList}
 PRAVILA ZA NALOGO:
 - Generiraj NATANKO ENO nalogo, edinstveno za tega učenca.
 - Uporabi LaTeX za matematične izraze: ulomki kot \\frac{a}{b}, potence kot x^{2}, koreni kot \\sqrt{x}, decimalna vejica kot 0{,}5.
-- V polju "answer_latex" uporabi ENAK zapis kot v besedilu naloge (en backslash pred \\frac).
+- V poljih "answer_latex" in "latex" uporabi ENAK zapis kot v besedilu naloge (en backslash pred \\frac).
 - Naloga naj bo v slovenščini, primerna ${grade}. razredu.
-- Odgovor naj bo enolično določljiv in zapisan kot ŠTEVILO.
+- Vsi odgovori v "answers" naj bodo enolično določljivi in zapisani kot ŠTEVILA.
 
 Vrni izključno JSON:
 {
   "question": "kratek prikaz naloge v LaTeX/tekstu",
+  "answers": [{"label":"Odgovor","value":0.75,"latex":"\\\\frac{3}{4}"}],
   "answer": 0.75,
   "answer_latex": "\\\\frac{3}{4}",
   "sketch": null
@@ -790,15 +799,33 @@ Vrni izključno JSON:
         prompt += `\n\nOPOZORILO: Neveljavna struktura. Vrni veljaven JSON.`;
         continue;
       }
-      const ansNum = typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer);
-      if (isNaN(ansNum)) {
-        prompt += `\n\nOPOZORILO: Odgovor ni število. Vrni številski odgovor.`;
-        continue;
+
+      let answersArr = [];
+      if (Array.isArray(data.answers) && data.answers.length) {
+        answersArr = data.answers.map(a => ({
+          label: String(a.label || 'Odgovor'),
+          value: typeof a.value === 'number' ? a.value : parseNumberString(a.value),
+          latex: normalizeLatex(a.latex || String(a.value))
+        })).filter(a => !isNaN(a.value));
       }
+      if (!answersArr.length) {
+        const ansNum = typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer);
+        if (isNaN(ansNum)) {
+          prompt += `\n\nOPOZORILO: Odgovor ni število. Vrni številski odgovor.`;
+          continue;
+        }
+        answersArr = [{
+          label: 'Odgovor',
+          value: ansNum,
+          latex: normalizeLatex(data.answer_latex || String(data.answer))
+        }];
+      }
+
       const candidate = {
         question: normalizeLatex(data.question),
-        answer: ansNum,
-        answerRaw: normalizeLatex(data.answer_latex || String(data.answer)),
+        answer: answersArr[0].value,
+        answerRaw: answersArr[0].latex,
+        answers: answersArr,
         sketch: data.sketch || null
       };
 
@@ -817,11 +844,23 @@ Vrni izključno JSON:
     if (!finalData) {
       const response = await callAI(prompt);
       const data = JSON.parse(response.choices[0].message.content);
-      const ansNum = typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer);
+      let answersArr = Array.isArray(data.answers) && data.answers.length
+        ? data.answers.map(a => ({
+            label: String(a.label || 'Odgovor'),
+            value: typeof a.value === 'number' ? a.value : parseNumberString(a.value),
+            latex: normalizeLatex(a.latex || String(a.value))
+          })).filter(a => !isNaN(a.value))
+        : [{
+            label: 'Odgovor',
+            value: typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer),
+            latex: normalizeLatex(data.answer_latex || String(data.answer))
+          }];
+      if (!answersArr.length) answersArr = [{ label: 'Odgovor', value: 0, latex: '0' }];
       finalData = {
         question: normalizeLatex(data.question),
-        answer: ansNum,
-        answerRaw: normalizeLatex(data.answer_latex || String(data.answer)),
+        answer: answersArr[0].value,
+        answerRaw: answersArr[0].latex,
+        answers: answersArr,
         sketch: data.sketch || null
       };
     }
@@ -830,6 +869,7 @@ Vrni izključno JSON:
       question: finalData.question,
       answer: finalData.answer,
       answerRaw: finalData.answerRaw,
+      answers: finalData.answers,
       sketch: finalData.sketch,
       level
     };
@@ -840,6 +880,7 @@ Vrni izključno JSON:
 
     res.json({
       question: finalData.question,
+      answers: finalData.answers,
       sketch: finalData.sketch,
       level, correct: sess.correct, target: 5, grade
     });
@@ -858,7 +899,7 @@ Vrni izključno JSON:
    API: PREVERJANJE
    ============================================================ */
 app.post('/api/check-answer', async (req, res) => {
-  const { username, userAnswer } = req.body || {};
+  const { username, userAnswers } = req.body || {};
   if (!username) return res.status(400).json({ error: 'Manjka username.' });
   const user = DATA.users[username];
   if (!user || user.role !== 'student') return res.status(403).json({ error: 'Samo učenec.' });
@@ -883,28 +924,40 @@ app.post('/api/check-answer', async (req, res) => {
     return res.status(403).json({ error: 'Rok je potekel.' });
   }
 
-  let userNum = parseNumberString(userAnswer);
-  let isCorrect = false;
+  const expected = sess.currentTask.answers && sess.currentTask.answers.length
+    ? sess.currentTask.answers
+    : [{ label: 'Odgovor', value: sess.currentTask.answer, latex: sess.currentTask.answerRaw || String(sess.currentTask.answer) }];
 
-  if (!isNaN(userNum)) {
-    isCorrect = Math.abs(userNum - sess.currentTask.answer) < 1e-9;
-  } else {
-    try {
-      const prompt = `Si matematični tutor. Učenec je odgovoril na naslednjo nalogo:
+  let allCorrect = true;
+  const perAnswer = [];
+  for (let i = 0; i < expected.length; i++) {
+    const exp = expected[i];
+    const rawUser = (Array.isArray(userAnswers) && userAnswers[i] !== undefined)
+      ? userAnswers[i]
+      : '';
+    let userNum = parseNumberString(rawUser);
+    let ok = false;
+    if (!isNaN(userNum)) {
+      ok = Math.abs(userNum - exp.value) < 1e-9;
+    } else if (String(rawUser).trim() !== '') {
+      try {
+        const prompt = `Si matematični tutor. Učenec je odgovoril na nalogo:
 NALOGA: ${sess.currentTask.question}
-PRAVILEN ODGOVOR: ${sess.currentTask.answer} (zapis: ${sess.currentTask.answerRaw || sess.currentTask.answer})
-UČENČEV ODGOVOR: "${userAnswer}"
+PODVPRAŠANJE: "${exp.label}"
+PRAVILEN ODGOVOR: ${exp.value} (zapis: ${exp.latex})
+UČENČEV ODGOVOR: "${rawUser}"
 
 Ugotovi, ali je učenčev odgovor pravilen (vključno z enakovrednimi zapisi, npr. "pol", "ena polovica", "1/2", "0.5").
-Vrni JSON:
-{ "is_correct": true/false, "normalized_answer": "številski zapis", "reason": "kratka razlaga" }`;
-      const response = await callAI(prompt);
-      const aiEval = JSON.parse(response.choices[0].message.content);
-      isCorrect = !!aiEval.is_correct;
-      if (aiEval.normalized_answer) userNum = parseNumberString(aiEval.normalized_answer);
-    } catch (e) {
-      return res.status(500).json({ error: 'Napaka pri ocenjevanju odgovora.' });
+Vrni JSON: { "is_correct": true/false }`;
+        const response = await callAI(prompt);
+        const aiEval = JSON.parse(response.choices[0].message.content);
+        ok = !!aiEval.is_correct;
+      } catch (e) {
+        ok = false;
+      }
     }
+    if (!ok) allCorrect = false;
+    perAnswer.push({ label: exp.label, ok });
   }
 
   sess.attempts++;
@@ -917,14 +970,15 @@ Vrni JSON:
   }
   const st = DATA.stats[username][chapterId];
   st.total++;
-  if (isCorrect) { st.correct++; if (sess.attempts === 1) st.correctFirst++; }
+  if (allCorrect) { st.correct++; if (sess.attempts === 1) st.correctFirst++; }
   else {
     st.wrong++;
     const existing = st.errors.find(e => e.question === sess.currentTask.question);
     if (existing) existing.count++;
     else st.errors.push({
-      question: sess.currentTask.question, userAns: String(userAnswer),
-      correctAns: sess.currentTask.answerRaw || String(sess.currentTask.answer),
+      question: sess.currentTask.question,
+      userAns: Array.isArray(userAnswers) ? userAnswers.join(' | ') : String(userAnswers),
+      correctAns: expected.map(e => e.latex).join(' | '),
       count: 1, level: sess.currentTask.level
     });
     if (st.errors.length > 100) st.errors = st.errors.slice(-100);
@@ -932,12 +986,12 @@ Vrni JSON:
   const t = sess.currentTask.type || 'llm';
   if (!st.byType[t]) st.byType[t] = { total: 0, correct: 0 };
   st.byType[t].total++;
-  if (isCorrect) st.byType[t].correct++;
-  st.history.push({ ts: Date.now(), question: sess.currentTask.question, ok: isCorrect, attempt: sess.attempts, level: sess.currentTask.level });
+  if (allCorrect) st.byType[t].correct++;
+  st.history.push({ ts: Date.now(), question: sess.currentTask.question, ok: allCorrect, attempt: sess.attempts, level: sess.currentTask.level });
   if (st.history.length > 300) st.history = st.history.slice(-300);
   await saveData();
 
-  if (isCorrect) {
+  if (allCorrect) {
     sess.correct++;
     if (sess.correct >= 5) {
       sess.finished = true; saveData();
@@ -957,11 +1011,12 @@ Vrni JSON:
   } else {
     let steps = [];
     try {
+      const correctText = expected.map(e => e.label + ': ' + e.latex).join('; ');
       const prompt = `Si izkušen, prijazen učitelj matematike v slovenski osnovni šoli. Učenec (${ch.grade}. razred) je napačno rešil nalogo in potrebuje KRATKO razlago.
 
 NALOGA: ${sess.currentTask.question}
-PRAVILEN ODGOVOR: ${sess.currentTask.answerRaw || sess.currentTask.answer}
-UČENČEV NAPAČNI ODGOVOR: "${userAnswer}"
+PRAVILNI ODGOVORI: ${correctText}
+UČENČEVI ODGOVORI: ${Array.isArray(userAnswers) ? userAnswers.map((a, i) => (expected[i] ? expected[i].label + '=' + a : a)).join('; ') : userAnswers}
 
 RAZLAGA MORA BITI:
 - Napisana v ZELO PREPROSTEM SLOVENSKEM JEZIKU, primernem ${ch.grade}. razredu OŠ.
@@ -977,14 +1032,14 @@ Vrni JSON: { "steps": ["korak 1", "korak 2", "Rezultat: ..."] }`;
       const data = JSON.parse(response.choices[0].message.content);
       steps = Array.isArray(data.steps) ? data.steps.map(normalizeLatex) : [];
     } catch (e) {
-      steps = ['Rezultat: ' + normalizeLatex(sess.currentTask.answerRaw || sess.currentTask.answer)];
+      steps = expected.map(e => 'Rezultat: ' + e.latex);
     }
     sess.awaitingNext = true; saveData();
     return res.json({
       correct: false, finished: false,
       correctCount: sess.correct, target: 5,
-      correctAnswer: sess.currentTask.answer,
-      correctAnswerRaw: normalizeLatex(sess.currentTask.answerRaw || ''),
+      correctAnswers: expected.map(e => ({ label: e.label, value: e.value, latex: e.latex })),
+      perAnswer: perAnswer,
       steps: steps,
       message: 'Ni pravilno. Preberi kratko razlago in nato klikni "Poskusi s podobno nalogo".'
     });
