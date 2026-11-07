@@ -40,7 +40,6 @@ function normalizeLatex(s) {
   return t;
 }
 
-// Pretvori uporabniški odgovor v število (podpira 1/2, 0,5, 0.5, -3, +7, 3/4)
 function parseNumberString(raw) {
   if (raw === null || raw === undefined) return NaN;
   let s = String(raw).trim().replace(/\s+/g, '').replace(',', '.');
@@ -55,11 +54,9 @@ function parseNumberString(raw) {
   return isNaN(n) ? NaN : n;
 }
 
-// Preveri, ali sta dve števili enaki (s toleranco)
 function numbersEqual(a, b, tolerance = 1e-9) {
   if (isNaN(a) || isNaN(b)) return false;
   const diff = Math.abs(a - b);
-  // relativna toleranca za velika števila + absolutna za majhna
   const scale = Math.max(Math.abs(a), Math.abs(b), 1);
   return diff <= tolerance * scale;
 }
@@ -135,12 +132,11 @@ function generatePassword() {
 }
 
 /* ============================================================
-   ZDRUŽI TEMA SKLOPA (title + instructions + staro topic)
+   ZDRUŽI TEMA SKLOPA (samo za interno prepoznavo)
    ============================================================ */
 function chapterTopicText(ch) {
   const parts = [];
   if (ch.title) parts.push(ch.title);
-  if (ch.topic) parts.push(ch.topic);
   if (ch.instructions) parts.push(ch.instructions);
   return parts.join(' ').trim();
 }
@@ -751,6 +747,11 @@ app.post('/api/generate-task', async (req, res) => {
   * {"type":"circle","data":{"r":5,"unit":"cm"}}
   * {"type":"angle","data":{"alpha":45,"beta":60,"unit":"°"}}
 - Če skica ni smiselna, vrni "sketch": null.
+
+⚠️ POMEMBNO – BREZ PODVAJANJA:
+- Če so podatki (npr. dolžine stranic) prikazani na skici, jih NE ponavljaj v besedilu naloge.
+- Če so podatki v besedilu naloge, jih NE prikazuj na skici.
+- Skica in besedilo se dopolnjujeta, ne podvajata.
 `;
   } else {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
@@ -927,8 +928,6 @@ Vrni JSON:
 
 /* ============================================================
    API: PREVERJANJE
-   – Preproste odgovore preveri JS lokalno.
-   – AI se kliče SAMO, če odgovora ni mogoče pretvoriti v število.
    ============================================================ */
 app.post('/api/check-answer', async (req, res) => {
   const { username, userAnswers } = req.body || {};
@@ -973,12 +972,9 @@ app.post('/api/check-answer', async (req, res) => {
     let ok = false;
     const userNum = parseNumberString(rawUser);
 
-    // 1) PREPROSTO PREVERJANJE Z JS
     if (!isNaN(userNum)) {
       ok = numbersEqual(userNum, exp.value, 1e-9);
-      // če je številka, NE kličemo AI
     } else if (String(rawUser).trim() !== '') {
-      // 2) AI – SAMO za odgovore, ki niso številke (npr. "pol", "tri četrt")
       aiCalls++;
       try {
         const prompt = `Si matematični tutor. Učenec je odgovoril na nalogo:
