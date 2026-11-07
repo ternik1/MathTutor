@@ -822,6 +822,8 @@ function startOrResumeSession(ch) {
       if (data.error) { document.getElementById('taskText').textContent = 'Napaka: ' + data.error; return; }
       llmState.level = data.level || 1;
       llmState.correct = data.correct || 0;
+      llmState.progression = data.progression || { level: 1, correctInLevel: 0 };
+      llmState.requiredInLevel = data.requiredInLevel || 2;
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
       if (data.hasCurrentTask && data.currentTask) {
         currentTask = {
@@ -856,7 +858,12 @@ function startOrResumeSession(ch) {
     .catch(() => { document.getElementById('taskText').textContent = 'Napaka pri povezavi.'; });
 }
 function updateProgressUI_LLM() {
-  document.getElementById('progressTasks').textContent = 'Pravilnih: ' + llmState.correct + ' / 5  •  Raven: ' + llmState.level + ' / 5';
+  var prog = llmState.progression || { level: 1, correctInLevel: 0 };
+  var req = llmState.requiredInLevel || (prog.level === 3 ? 1 : 2);
+  var levelNames = { 1: 'osnovna', 2: 'srednja', 3: 'zahtevna' };
+  document.getElementById('progressTasks').textContent =
+    'Stopnja ' + prog.level + '/3 (' + levelNames[prog.level] + ')  •  ' +
+    prog.correctInLevel + '/' + req + ' pravilnih na tej stopnji';
   document.getElementById('progressStats').textContent = currentChapter.title;
 }
 function renderAnswerFields(answers) {
@@ -913,6 +920,8 @@ function loadLLMTask(isRetry) {
       llmState.level = data.level;
       llmState.correct = data.correct;
       llmState.awaitingNext = false;
+      llmState.progression = data.progression || { level: data.level || 1, correctInLevel: 0 };
+      llmState.requiredInLevel = data.requiredInLevel || 2;
       tt.textContent = currentTask.question;
       renderMath(tt);
       if (currentTask.sketch) renderSketch(currentTask.sketch);
@@ -924,9 +933,9 @@ function loadLLMTask(isRetry) {
     .catch(() => { tt.textContent = 'Napaka pri povezavi.'; });
 }
 function showLLMFinished(correct, attempts) {
-  document.getElementById('taskText').textContent = '🎉 Bravo! Rešil si vseh 5 nalog!';
+  document.getElementById('taskText').textContent = '🎉 Bravo! Rešil si vse naloge na vseh treh stopnjah!';
   document.getElementById('progressTasks').textContent = 'Seja zaključena';
-  document.getElementById('progressStats').textContent = 'Pravilnih: ' + correct + ' / 5  •  Poskusov: ' + attempts;
+  document.getElementById('progressStats').textContent = 'Pravilnih: ' + correct + '  •  Poskusov: ' + attempts;
   document.getElementById('answersContainer').innerHTML = '';
   document.getElementById('checkBtn').style.display = 'none';
   document.getElementById('retryBtn').style.display = 'none';
@@ -981,6 +990,10 @@ function checkAnswer() {
         fb.textContent = '✅ ' + data.message;
         llmState.correct = data.correctCount;
         llmState.level = data.nextLevel;
+        llmState.correct = data.correctCount;
+        if (data.progression) llmState.progression = data.progression;
+        if (data.requiredInLevel) llmState.requiredInLevel = data.requiredInLevel;
+        llmState.level = (data.progression && data.progression.level) || data.nextLevel || llmState.level;
         document.getElementById('explanationBox').innerHTML = '';
         setTimeout(() => { loadLLMTask(false); }, 1300);
       } else {
