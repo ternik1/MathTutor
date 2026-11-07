@@ -104,7 +104,7 @@ function hasSketchData(sketch) {
 }
 
 /* ============================================================
-   PREVERJANJE SKICE (strogo)
+   PREVERJANJE SKICE
    ============================================================ */
 function validateSketch(question, sketch) {
   if (!sketch || !sketch.type) return { ok: true };
@@ -113,12 +113,10 @@ function validateSketch(question, sketch) {
   const hasNumbersInSketch = sketchHasNumbers(sketch);
   const hasNumbersInText = textHasNumbers(question);
 
-  // Pravilo 1: skica in besedilo ne smeta imeti številk hkrati
   if (hasNumbersInSketch && hasNumbersInText) {
     return { ok: false, reason: 'Skica in besedilo hkrati vsebujeta številke (podvajanje podatkov).' };
   }
 
-  // Pravilo 2: enakostranični trikotnik mora biti v besedilu označen
   if (sketch.type === 'triangle') {
     const isEquilateral = /enakostran|enakostrani/i.test(question);
     const a = parseFloat(data.a), b = parseFloat(data.b), c = parseFloat(data.c);
@@ -131,10 +129,9 @@ function validateSketch(question, sketch) {
 }
 
 /* ============================================================
-   PREVERJANJE SKLADNOSTI S STOPNJO (steps_required)
+   STROGA PRAVILA GLEDE NA STOPNJO
    ============================================================ */
 function allowedStepsForLevel(level) {
-  // stopnja 1: 1 korak, stopnja 2: 2 koraka, stopnja 3: 2-3 koraki
   if (level <= 1) return 1;
   if (level === 2) return 2;
   return 3;
@@ -149,9 +146,6 @@ function validateStepsRequired(level, stepsRequired) {
   return { ok: true };
 }
 
-/* ============================================================
-   PREPOVEDANE BESEDE PO STOPNJI (skladnost z učnim načrtom)
-   ============================================================ */
 function validateTopicForLevel(question, level, topicRules) {
   if (!topicRules) return { ok: true };
   const rules = topicRules[level] || topicRules[3];
@@ -168,7 +162,7 @@ function validateTopicForLevel(question, level, topicRules) {
 }
 
 /* ============================================================
-   PROFIL UČENCA ZA PROMPT
+   PROFIL UČENCA
    ============================================================ */
 function buildStudentProfile(username, chapterId) {
   const stats = DATA.stats[username] && DATA.stats[username][chapterId];
@@ -191,12 +185,11 @@ Zadnje 3 napake: ${lastErrors || 'brez'}.`;
 }
 
 /* ============================================================
-   PRAVILA PO TEMI IN STOPNJI (skladnost z iUčbenikom)
+   PRAVILA PO TEMI IN STOPNJI
    ============================================================ */
 function getTopicRules(topicText) {
   const t = (topicText || '').toLowerCase();
 
-  // Obseg in ploščina trikotnika – BREZ Pitagorovega izreka
   if ((t.includes('trikot') || t.includes('obseg') || t.includes('ploščin')) &&
       !t.includes('pitagor')) {
     return {
@@ -215,7 +208,6 @@ function getTopicRules(topicText) {
     };
   }
 
-  // Pitagorov izrek
   if (t.includes('pitagor')) {
     return {
       1: { forbidden: [], note: 'Prepoznaj pravokotni trikotnik, označi kateti in hipotenuzo.' },
@@ -224,7 +216,6 @@ function getTopicRules(topicText) {
     };
   }
 
-  // Cela števila
   if (t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak')) {
     return {
       1: { forbidden: ['ulom', 'decimal', 'koren', 'potenc'], note: 'Seštevanje in odštevanje enomestnih celih števil.' },
@@ -233,7 +224,6 @@ function getTopicRules(topicText) {
     };
   }
 
-  // Ulomki
   if (t.includes('ulom')) {
     return {
       1: { forbidden: ['decimal', 'negativ'], note: 'Ulomki z enakim imenovalcem, seštevanje.' },
@@ -242,7 +232,6 @@ function getTopicRules(topicText) {
     };
   }
 
-  // Decimalna števila
   if (t.includes('decimal')) {
     return {
       1: { forbidden: ['ulom'], note: 'Decimalna števila z eno decimalko, seštevanje.' },
@@ -254,9 +243,6 @@ function getTopicRules(topicText) {
   return null;
 }
 
-/* ============================================================
-   STROGA PRAVILA GLEDE NA RAZRED IN TEMO
-   ============================================================ */
 function strictLevelRules(grade, topic) {
   const t = (topic || '').toLowerCase();
   const isCelaStevila = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
@@ -366,9 +352,6 @@ function generatePassword() {
   return p;
 }
 
-/* ============================================================
-   ZDRUŽI TEMA SKLOPA
-   ============================================================ */
 function chapterTopicText(ch) {
   const parts = [];
   if (ch.title) parts.push(ch.title);
@@ -469,7 +452,7 @@ async function saveData() {
 }
 
 /* ============================================================
-   KVOTA IN RETRY (Groq)
+   KVOTA IN RETRY
    ============================================================ */
 let lastKnownQuota = { remainingRequests: null, resetRequestsMs: null, remainingTokens: null, resetTokensMs: null, lastUpdated: 0 };
 function parseResetTime(str) {
@@ -546,7 +529,7 @@ app.post('/api/login', (req, res) => {
 });
 
 /* ============================================================
-   API: UČENCI (admin)
+   API: UČENCI
    ============================================================ */
 function requireAdmin(req, res, next) {
   const adminUsername = req.headers['x-admin-user'] || (req.body && req.body._admin) || req.query['x-admin-user'];
@@ -768,7 +751,6 @@ app.delete('/api/chapters/:id', requireAdmin, async (req, res) => {
    ============================================================ */
 function createEmptySession() {
   return {
-    level: 1,
     progression: { level: 1, correctInLevel: 0 },
     correct: 0,
     attempts: 0,
@@ -879,7 +861,6 @@ app.post('/api/generate-task', async (req, res) => {
     ? Array.from(new Set(recentNumbers.map(n => n.toFixed(2)))).join(', ')
     : '(še ni bilo nalog)';
 
-  // Prejšnja neuspešna naloga – ne sme se ponoviti
   let lastFailedNotice = '';
   if (sess.lastFailedTask) {
     lastFailedNotice = `\n⚠️ PREJŠNJA NALOGA JE BILA NEUSPEŠNO GENERIRANA ALI ZAVRNJENA:\n"${sess.lastFailedTask}"\nNE PONAVLJAJ te naloge. Generiraj drugačno nalogo.`;
@@ -989,6 +970,7 @@ Vrni JSON:
 
   try {
     let finalData = null;
+    let lastRejectReason = '';
     for (let attempt = 1; attempt <= 6; attempt++) {
       const messages = [
         { role: 'system', content: systemMessage },
@@ -1028,33 +1010,34 @@ Vrni JSON:
       const stepsRequired = Array.isArray(data.steps_required) ? data.steps_required : [];
 
       if (!taskTypeAllowed(questionSanitized, topicText)) {
+        lastRejectReason = 'Napačen tip naloge za to temo.';
         prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip za to temo.`;
         continue;
       }
 
-      // Preveri prepovedane koncepte po stopnji
       const topicCheck = validateTopicForLevel(questionSanitized, level, topicRules);
       if (!topicCheck.ok) {
+        lastRejectReason = topicCheck.reason;
         prompt += `\n\nOPOZORILO: ${topicCheck.reason}`;
         continue;
       }
 
-      // Preveri število korakov
       const stepsCheck = validateStepsRequired(level, stepsRequired);
       if (!stepsCheck.ok) {
+        lastRejectReason = stepsCheck.reason;
         prompt += `\n\nOPOZORILO: ${stepsCheck.reason} Poenostavi nalogo.`;
         continue;
       }
 
-      // Preveri skico
       const sketchCheck = validateSketch(questionSanitized, sketch);
       if (!sketchCheck.ok) {
+        lastRejectReason = sketchCheck.reason;
         prompt += `\n\nOPOZORILO: ${sketchCheck.reason}`;
         continue;
       }
 
-      // Preveri podobnost
       if (isTooSimilar({ question: questionSanitized }, recent.slice(-10))) {
+        lastRejectReason = 'Preveč podobna prejšnjim nalogam.';
         prompt += `\n\nOPOZORILO: Prejšnji poskus je bil preveč podoben. Uporabi drugačna števila.`;
         continue;
       }
@@ -1071,9 +1054,11 @@ Vrni JSON:
     }
 
     if (!finalData) {
-      sess.lastFailedTask = prompt.slice(0, 200);
+      sess.lastFailedTask = prompt.slice(-400);
       await saveData();
-      return res.status(500).json({ error: 'Naloge ni bilo mogoče generirati po več poskusih. Poskusi znova.' });
+      return res.status(500).json({
+        error: 'Naloge ni bilo mogoče generirati po več poskusih.' + (lastRejectReason ? ' Razlog: ' + lastRejectReason : '') + ' Poskusi znova.'
+      });
     }
 
     sess.currentTask = {
@@ -1234,6 +1219,7 @@ Vrni JSON: { "is_correct": true/false }`;
         correctCount: sess.correct, attempts: sess.attempts,
         message: 'Bravo! Rešil si vse naloge na vseh treh stopnjah. 🎉',
         progression: sess.progression,
+        requiredInLevel: requiredInLevel(sess.progression.level),
         aiCalls
       });
     }
@@ -1247,7 +1233,6 @@ Vrni JSON: { "is_correct": true/false }`;
       aiCalls
     });
   } else {
-    // Napačno – ne napreduj, shrani za preprečitev ponovitve
     sess.lastFailedTask = sess.currentTask.question;
     let steps = [];
     try {
