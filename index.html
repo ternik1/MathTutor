@@ -104,12 +104,8 @@
   .task-layout {
     display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;
   }
-  .task-left {
-    flex: 1 1 300px; min-width: 260px;
-  }
-  .task-right {
-    flex: 0 0 auto; width: 380px; max-width: 100%;
-  }
+  .task-left { flex: 1 1 300px; min-width: 260px; }
+  .task-right { flex: 0 0 auto; width: 380px; max-width: 100%; }
   .task-text {
     font-size: 20px; font-weight: 600; color: #333;
     line-height: 1.6; margin-bottom: 14px;
@@ -378,7 +374,7 @@
       <input id="newChapterDesc" placeholder="Kratek opis za učence (npr. Vaja iz obsega in ploščine trikotnika)">
       <div class="field-hint">↑ Ta opis učenci vidijo na seznamu sklopov.</div>
       <textarea id="newChapterInstructions" placeholder="⚠️ INTERNO – samo za Groq (učenci tega ne vidijo). Npr.: 'Naloge iz obsega in ploščine trikotnika. Podane so vse tri stranice in višina. Brez Pitagorovega izreka. Skica naj bo trikotnik.'"></textarea>
-      <div class="field-hint">↑ Skrita navodila, ki jih prejme Groq pri generiranju nalog. Učenci jih nikoli ne vidijo.</div>
+      <div class="field-hint">↑ Skrita navodila, ki jih prejme Groq pri generiranju nalog.</div>
       <select id="newChapterType">
         <option value="llm">LLM tutor (poljubna tema prek Groq)</option>
         <option value="cela_stevila">Cela števila (vgrajen generator)</option>
@@ -607,30 +603,18 @@ function renderSketch(sketch) {
   try {
     var type = sketch.type;
     var d = sketch.data || {};
-
-    var common = {
-      axis: false,
-      showNavigation: false,
-      showCopyright: false,
-      keepaspectratio: true
-    };
+    var common = { axis: false, showNavigation: false, showCopyright: false, keepaspectratio: true };
 
     if (type === 'right_triangle') {
       var a = parseFloat(d.a) || 3;
       var b = parseFloat(d.b) || 4;
       var unit = d.unit || 'cm';
       var maxv = Math.max(a, b);
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
-        boundingbox: [-1, maxv + 1.5, maxv + 1.5, -1]
-      }));
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, maxv + 1.5, maxv + 1.5, -1] }));
       var A = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 2 });
       var B = currentBoard.create('point', [b, 0], { name: 'B', fixed: true, size: 2 });
       var C = currentBoard.create('point', [0, a], { name: 'C', fixed: true, size: 2 });
-      currentBoard.create('polygon', [A, B, C], {
-        borders: { strokeColor: '#667eea', strokeWidth: 2 },
-        fillColor: '#eef0fa', fillOpacity: 0.5,
-        vertices: { visible: false }
-      });
+      currentBoard.create('polygon', [A, B, C], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
       currentBoard.create('text', [b / 2, -0.7, 'b = ' + b + ' ' + unit], { fontSize: 11 });
       currentBoard.create('text', [-1.3, a / 2, 'a = ' + a + ' ' + unit], { fontSize: 11 });
       currentBoard.create('text', [b / 2, a / 2 + 0.6, 'c = ?'], { fontSize: 11 });
@@ -638,46 +622,30 @@ function renderSketch(sketch) {
       var ra = parseFloat(d.a) || 5;
       var rb = parseFloat(d.b) || 3;
       var ru = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
-        boundingbox: [-1, ra + 1.5, rb + 1.5, -1]
-      }));
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, ra + 1.5, rb + 1.5, -1] }));
       var P1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
       var P2 = currentBoard.create('point', [rb, 0], { name: '', fixed: true, visible: false });
       var P3 = currentBoard.create('point', [rb, ra], { name: '', fixed: true, visible: false });
       var P4 = currentBoard.create('point', [0, ra], { name: '', fixed: true, visible: false });
-      currentBoard.create('polygon', [P1, P2, P3, P4], {
-        borders: { strokeColor: '#667eea', strokeWidth: 2 },
-        fillColor: '#eef0fa', fillOpacity: 0.5,
-        vertices: { visible: false }
-      });
+      currentBoard.create('polygon', [P1, P2, P3, P4], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
       currentBoard.create('text', [rb / 2, -0.7, 'b = ' + rb + ' ' + ru], { fontSize: 11 });
       currentBoard.create('text', [-1.3, ra / 2, 'a = ' + ra + ' ' + ru], { fontSize: 11 });
     } else if (type === 'square') {
       var sa = parseFloat(d.a) || 4;
       var su = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
-        boundingbox: [-1, sa + 1.5, sa + 1.5, -1]
-      }));
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, sa + 1.5, sa + 1.5, -1] }));
       var S1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
       var S2 = currentBoard.create('point', [sa, 0], { name: '', fixed: true, visible: false });
       var S3 = currentBoard.create('point', [sa, sa], { name: '', fixed: true, visible: false });
       var S4 = currentBoard.create('point', [0, sa], { name: '', fixed: true, visible: false });
-      currentBoard.create('polygon', [S1, S2, S3, S4], {
-        borders: { strokeColor: '#667eea', strokeWidth: 2 },
-        fillColor: '#eef0fa', fillOpacity: 0.5,
-        vertices: { visible: false }
-      });
+      currentBoard.create('polygon', [S1, S2, S3, S4], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
       currentBoard.create('text', [sa / 2, -0.7, 'a = ' + sa + ' ' + su], { fontSize: 11 });
     } else if (type === 'circle') {
       var r = parseFloat(d.r) || 5;
       var cu = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
-        boundingbox: [-r - 1, r + 1, r + 1, -r - 1]
-      }));
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-r - 1, r + 1, r + 1, -r - 1] }));
       var S = currentBoard.create('point', [0, 0], { name: 'S', fixed: true, size: 2 });
-      currentBoard.create('circle', [S, r], {
-        strokeColor: '#667eea', strokeWidth: 2, fillColor: '#eef0fa', fillOpacity: 0.3
-      });
+      currentBoard.create('circle', [S, r], { strokeColor: '#667eea', strokeWidth: 2, fillColor: '#eef0fa', fillOpacity: 0.3 });
       currentBoard.create('segment', [S, [r, 0]], { strokeColor: '#e74c3c', strokeWidth: 2, dash: 2 });
       currentBoard.create('text', [r / 2, 0.4, 'r = ' + r + ' ' + cu], { fontSize: 11 });
     } else if (type === 'triangle') {
@@ -686,28 +654,20 @@ function renderSketch(sketch) {
       var tc = parseFloat(d.c) || 7;
       var tu = d.unit || 'cm';
       var maxT = Math.max(ta, tb, tc);
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
-        boundingbox: [-1, maxT + 1.5, maxT + 1.5, -1]
-      }));
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, maxT + 1.5, maxT + 1.5, -1] }));
       var T1 = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 2 });
       var T2 = currentBoard.create('point', [tc, 0], { name: 'B', fixed: true, size: 2 });
       var T3 = currentBoard.create('point', [ta * 0.5, tb * 0.8], { name: 'C', fixed: true, size: 2 });
-      currentBoard.create('polygon', [T1, T2, T3], {
-        borders: { strokeColor: '#667eea', strokeWidth: 2 },
-        fillColor: '#eef0fa', fillOpacity: 0.5,
-        vertices: { visible: false }
-      });
+      currentBoard.create('polygon', [T1, T2, T3], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
       currentBoard.create('text', [tc / 2, -0.7, 'c = ' + tc + ' ' + tu], { fontSize: 11 });
     } else if (type === 'angle') {
       var alpha = parseFloat(d.alpha) || 45;
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
-        boundingbox: [-1, 5, 6, -1]
-      }));
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, 5, 6, -1] }));
       var V = currentBoard.create('point', [0, 0], { name: 'V', fixed: true, size: 2 });
-      var A = currentBoard.create('point', [5, 0], { name: 'A', fixed: true, size: 2 });
-      var B = currentBoard.create('point', [5 * Math.cos(alpha * Math.PI / 180), 5 * Math.sin(alpha * Math.PI / 180)], { name: 'B', fixed: true, size: 2 });
-      currentBoard.create('segment', [V, A], { strokeColor: '#667eea', strokeWidth: 2 });
-      currentBoard.create('segment', [V, B], { strokeColor: '#667eea', strokeWidth: 2 });
+      var Aa = currentBoard.create('point', [5, 0], { name: 'A', fixed: true, size: 2 });
+      var Bb = currentBoard.create('point', [5 * Math.cos(alpha * Math.PI / 180), 5 * Math.sin(alpha * Math.PI / 180)], { name: 'B', fixed: true, size: 2 });
+      currentBoard.create('segment', [V, Aa], { strokeColor: '#667eea', strokeWidth: 2 });
+      currentBoard.create('segment', [V, Bb], { strokeColor: '#667eea', strokeWidth: 2 });
       currentBoard.create('text', [2.5, -0.6, 'α = ' + alpha + '°'], { fontSize: 11 });
     }
   } catch (e) {
@@ -773,7 +733,6 @@ function openCategory(cat) {
   document.getElementById('categoryTitle').textContent =
     cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje';
   document.getElementById('categoryInfo').textContent = 'Razred: ' + currentGrade + '.';
-
   fetch('/api/chapters?grade=' + currentGrade, { cache: 'no-store' })
     .then(r => r.json())
     .then(list => { allChapters = list; renderStudentChapterList(); })
@@ -823,7 +782,6 @@ function openChapter(ch) {
   document.getElementById('resumeBanner').classList.add('hidden');
   clearSketch();
   updateLevelIndicator();
-
   if (ch.type === 'llm' || ch.type === 'cela_stevila') startOrResumeSession(ch);
   else document.getElementById('taskText').textContent = 'Za to poglavje tutor še ni na voljo.';
 }
@@ -904,9 +862,7 @@ function startOrResumeSession(ch) {
 function renderAnswerFields(answers) {
   var cont = document.getElementById('answersContainer');
   cont.innerHTML = '';
-  if (!Array.isArray(answers) || !answers.length) {
-    answers = [{ label: 'Odgovor', value: 0, latex: '' }];
-  }
+  if (!Array.isArray(answers) || !answers.length) answers = [{ label: 'Odgovor', value: 0, latex: '' }];
   answers.forEach(function (a) {
     var wrap = document.createElement('div');
     wrap.className = 'answer-block';
@@ -937,7 +893,6 @@ function loadLLMTask(isRetry) {
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   clearSketch();
-
   fetch('/api/generate-task', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id, isRetry: !!isRetry })
@@ -993,7 +948,6 @@ function showLLMFinished(correct, attempts) {
     '<div style="text-align:center;margin-top:15px;">' +
     '<button class="secondary" onclick="startFresh()">Nova seja</button></div>';
 }
-
 function startFresh() {
   fetch('/api/reset-session', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1027,7 +981,6 @@ function checkAnswer() {
   document.getElementById('checkBtn').style.display = 'none';
   fb.className = 'feedback';
   fb.innerHTML = '<span class="loading"><span class="spinner"></span>Preverjam tvoje odgovore ...</span>';
-
   fetch('/api/check-answer', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: currentUser.username, userAnswers: userAnswers })
@@ -1065,9 +1018,7 @@ function checkAnswer() {
         }
         if (Array.isArray(data.correctAnswers)) {
           html += '<div class="correct-answer">Pravilni odgovori:<br>';
-          data.correctAnswers.forEach(a => {
-            html += '<b>' + a.label + ':</b> ' + normalizeLatex(a.latex) + '<br>';
-          });
+          data.correctAnswers.forEach(a => { html += '<b>' + a.label + ':</b> ' + normalizeLatex(a.latex) + '<br>'; });
           html += '</div>';
         } else {
           html += '<div class="correct-answer">Pravilen odgovor: ' + normalizeLatex(data.correctAnswerRaw || data.correctAnswer) + '</div>';
@@ -1229,7 +1180,6 @@ function saveStudentEdit() {
   if (!firstName || !lastName) { err.textContent = 'Vnesi ime in priimek.'; return; }
   if (!newUsername) { err.textContent = 'Vnesi uporabniško ime.'; return; }
   if (!password) { err.textContent = 'Vnesi geslo.'; return; }
-
   fetch('/api/students/' + editingStudentUsername, {
     method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
     body: JSON.stringify({ firstName, lastName, newUsername, password, grade })
@@ -1395,12 +1345,8 @@ function switchAnalysis(mode, ev) {
   Array.from(document.querySelectorAll('#teacherAnalysis [data-analysis-tab]')).forEach(t => t.classList.remove('active'));
   var activeBtn = document.querySelector('#teacherAnalysis [data-analysis-tab="' + mode + '"]');
   if (activeBtn) activeBtn.classList.add('active');
-
-  if (!studentsList.length) {
-    loadStudents().then(() => _runAnalysisMode(mode));
-  } else {
-    _runAnalysisMode(mode);
-  }
+  if (!studentsList.length) { loadStudents().then(() => _runAnalysisMode(mode)); }
+  else { _runAnalysisMode(mode); }
 }
 function _runAnalysisMode(mode) {
   if (mode === 'grade') renderTeacherByGrade();
@@ -1474,12 +1420,9 @@ function renderTeacherByChapter() {
   if (!allChapters.length) {
     c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam sklope ...</p>';
     fetch('/api/chapters', { cache: 'no-store', headers: authHeaders() }).then(r => r.json()).then(list => {
-      allChapters = list;
-      _renderChapterListForAnalysis();
+      allChapters = list; _renderChapterListForAnalysis();
     });
-  } else {
-    _renderChapterListForAnalysis();
-  }
+  } else { _renderChapterListForAnalysis(); }
 }
 function _renderChapterListForAnalysis() {
   var c = document.getElementById('analysisContent');
@@ -1520,9 +1463,8 @@ function runChapterAnalysis(chapterId) {
         });
       }
       html += '<h3 style="margin-top:16px;">Po učencih</h3><table><thead><tr><th>Učenec</th><th>Poskusi</th><th>Pravilnih</th><th>Uspešnost</th></tr></thead><tbody>';
-      if (!data.perStudent.length) {
-        html += '<tr><td colspan="4" class="empty-note">Ni podatkov.</td></tr>';
-      } else {
+      if (!data.perStudent.length) { html += '<tr><td colspan="4" class="empty-note">Ni podatkov.</td></tr>'; }
+      else {
         data.perStudent.forEach(p => {
           var name = studentsList.find(x => x.username === p.username);
           html += '<tr><td>' + (name ? name.firstName + ' ' + name.lastName : p.username) + '</td><td>' + p.total +
@@ -1537,7 +1479,7 @@ function runChapterAnalysis(chapterId) {
 }
 
 /* ============================================================
-   PODROBNA ANALIZA UČENCA (profil)
+   PODROBNA ANALIZA UČENCA
    ============================================================ */
 function openStudentDetail(username) {
   currentDetailUsername = username;
@@ -1546,16 +1488,13 @@ function openStudentDetail(username) {
   document.getElementById('studentDetailView').classList.remove('hidden');
   var content = document.getElementById('studentDetailContent');
   content.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam profil ...</p>';
-
   fetch('/api/student-detail/' + username, { headers: authHeaders() })
     .then(r => r.json())
     .then(data => {
       if (data.error) { content.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
-      document.getElementById('studentDetailTitle').textContent =
-        '👤 ' + data.firstName + ' ' + data.lastName;
+      document.getElementById('studentDetailTitle').textContent = '👤 ' + data.firstName + ' ' + data.lastName;
       document.getElementById('studentDetailSubtitle').textContent =
         data.grade + '. razred  •  ' + data.overall.total + ' poskusov  •  skupna uspešnost ' + data.overall.pct + '%';
-
       var html = '';
       html += '<div class="stats-grid">';
       html += '<div class="stat-card"><div class="num">' + data.overall.total + '</div><div class="lbl">Vseh poskusov</div></div>';
@@ -1563,13 +1502,11 @@ function openStudentDetail(username) {
       html += '<div class="stat-card"><div class="num ' + pctClass(data.overall.pct) + '">' + data.overall.pct + '%</div><div class="lbl">Uspešnost</div></div>';
       html += '<div class="stat-card"><div class="num">' + data.chapters.length + '</div><div class="lbl">Sklopov</div></div>';
       html += '</div>';
-
       if (!data.chapters.length) {
         html += '<p class="empty-note">Učenec še ni reševal nobenega sklopa.</p>';
         content.innerHTML = html;
         return;
       }
-
       ['domaca', 'utrjevanje'].forEach(cat => {
         var list = data.chapters.filter(c => c.category === cat);
         if (!list.length) return;
@@ -1590,7 +1527,6 @@ function openStudentDetail(username) {
           html += '<div id="chapterDetail_' + ch.chapterId + '" class="detail-box hidden" style="margin-bottom:12px;"></div>';
         });
       });
-
       content.innerHTML = html;
       content._detailData = data;
     })
@@ -1605,7 +1541,6 @@ function toggleChapterDetail(chapterId) {
   if (!data) return;
   var ch = data.chapters.find(c => c.chapterId === chapterId);
   if (!ch) return;
-
   var html = '';
   html += '<div class="stats-grid">';
   html += '<div class="stat-card"><div class="num">' + ch.total + '</div><div class="lbl">Poskusov</div></div>';
@@ -1613,7 +1548,6 @@ function toggleChapterDetail(chapterId) {
   html += '<div class="stat-card"><div class="num">' + ch.correctFirst + '</div><div class="lbl">1. poskus</div></div>';
   html += '<div class="stat-card"><div class="num ' + pctClass(ch.pct) + '">' + ch.pct + '%</div><div class="lbl">Uspešnost</div></div>';
   html += '</div>';
-
   if (ch.byType && ch.byType.length) {
     html += '<h3>Uspešnost po tipu naloge</h3>';
     ch.byType.forEach(t => {
@@ -1622,7 +1556,6 @@ function toggleChapterDetail(chapterId) {
       html += '<div class="bar-container"><div class="bar-fill" style="width:' + t.pct + '%"></div></div>';
     });
   }
-
   if (ch.topErrors && ch.topErrors.length) {
     html += '<h3 style="margin-top:14px;">Najpogostejše napake</h3>';
     ch.topErrors.forEach(e => {
@@ -1630,7 +1563,6 @@ function toggleChapterDetail(chapterId) {
         'Napačno: ' + e.userAns + ' • Pravilno: ' + normalizeLatex(e.correctAns) + ' • Ponovitve: ' + e.count + '</div>';
     });
   }
-
   if (ch.recentHistory && ch.recentHistory.length) {
     html += '<h3 style="margin-top:14px;">Zadnji poskusi</h3>';
     ch.recentHistory.forEach(h => {
@@ -1639,7 +1571,6 @@ function toggleChapterDetail(chapterId) {
         '<span class="badge-' + (h.ok ? 'ok' : 'fail') + '">' + (h.ok ? '✓' : '✗') + '</span></div>';
     });
   }
-
   el.innerHTML = html;
   el.classList.remove('hidden');
   renderMath(el);
