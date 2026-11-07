@@ -97,17 +97,38 @@
   .big-btn.utrjevanje { background: linear-gradient(135deg, #27ae60, #16a085); }
   .big-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.25); }
   .big-btn .sub { font-size: 13px; opacity: 0.9; font-weight: 500; margin-top: 6px; display: block; }
-  .task-box { background: #f8f9fc; border-radius: 12px; padding: 22px; margin: 20px 0; }
+  .task-box {
+    background: #f8f9fc; border-radius: 12px; padding: 22px; margin: 20px 0;
+  }
+  .task-layout {
+    display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;
+  }
+  .task-left {
+    flex: 1 1 300px; min-width: 260px;
+  }
+  .task-right {
+    flex: 0 0 auto; width: 380px; max-width: 100%;
+  }
   .task-text {
-    font-size: 26px; font-weight: 600; color: #333; margin-bottom: 20px;
-    line-height: 1.6; text-align: center; min-height: 40px;
+    font-size: 20px; font-weight: 600; color: #333;
+    line-height: 1.6; margin-bottom: 14px;
   }
-  .task-text .mjx-container { font-size: 140% !important; }
+  .task-text .mjx-container { font-size: 130% !important; }
   .sketch-box {
-    background: white; border-radius: 10px; padding: 10px;
-    margin-bottom: 16px; min-height: 320px;
+    background: white; border-radius: 10px; padding: 8px;
+    border: 1px solid #e0e0ea;
   }
-  .sketch-box .jxgbox { width: 100%; height: 300px; }
+  #jxgbox {
+    width: 100%;
+    height: 300px;
+    aspect-ratio: 4 / 3;
+    max-height: 300px;
+  }
+  @media (max-width: 720px) {
+    .task-layout { flex-direction: column; }
+    .task-right { width: 100%; }
+    #jxgbox { height: 260px; }
+  }
   .feedback { margin-top: 12px; font-size: 15px; line-height: 1.6; min-height: 22px; }
   .feedback.correct { color: #27ae60; font-weight: 600; }
   .feedback.wrong { color: #e74c3c; font-weight: 600; }
@@ -442,16 +463,22 @@
       <span id="progressStats"></span>
     </div>
     <div class="task-box">
-      <div class="task-text" id="taskText"></div>
-      <div id="sketchContainer" class="sketch-box hidden">
-        <div id="jxgbox" class="jxgbox"></div>
+      <div class="task-layout">
+        <div class="task-left">
+          <div class="task-text" id="taskText"></div>
+          <div id="answersContainer"></div>
+          <div class="btn-row" style="margin-top:12px;">
+            <button style="width:auto; padding:12px 24px;" id="checkBtn" onclick="checkAnswer()">Preveri</button>
+          </div>
+          <div class="feedback" id="feedback"></div>
+          <div id="explanationBox"></div>
+        </div>
+        <div class="task-right">
+          <div id="sketchContainer" class="sketch-box hidden">
+            <div id="jxgbox"></div>
+          </div>
+        </div>
       </div>
-      <div id="answersContainer"></div>
-      <div class="btn-row" style="margin-top:12px;">
-        <button style="width:auto; padding:12px 24px;" id="checkBtn" onclick="checkAnswer()">Preveri</button>
-      </div>
-      <div class="feedback" id="feedback"></div>
-      <div id="explanationBox"></div>
     </div>
     <div class="btn-row">
       <button class="secondary" id="retryBtn" onclick="retrySimilar()" style="display:none;">Poskusi s podobno nalogo →</button>
@@ -511,7 +538,12 @@ function authHeaders() { return currentUser ? { 'x-admin-user': currentUser.user
    ============================================================ */
 function normalizeLatex(text) {
   if (!text) return text;
-  return String(text).replace(/\\\\/g, '\\');
+  let t = String(text).replace(/\\\\/g, '\\');
+  t = t.replace(/\\text\{([^{}]*)\}/g, '$1');
+  t = t.replace(/\\mathrm\{([^{}]*)\}/g, '$1');
+  t = t.replace(/\\mbox\{([^{}]*)\}/g, '$1');
+  t = t.replace(/\\text/g, '');
+  return t;
 }
 
 async function renderMath(el) {
@@ -530,7 +562,7 @@ async function renderMath(el) {
 }
 
 /* ============================================================
-   JSXGRAPH – risanje skic
+   JSXGRAPH – risanje skic (omejeno na 360x260 px)
    ============================================================ */
 function clearSketch() {
   document.getElementById('sketchContainer').classList.add('hidden');
@@ -550,37 +582,47 @@ function renderSketch(sketch) {
   var box = document.getElementById('jxgbox');
   box.innerHTML = '';
 
+  // Velikost risalne plošče – fiksna, manjša
+  var W = 360, H = 260;
+
   try {
     var type = sketch.type;
     var d = sketch.data || {};
+
+    // Skupne nastavitve
+    var common = {
+      axis: false,
+      showNavigation: false,
+      showCopyright: false,
+      keepaspectratio: true
+    };
 
     if (type === 'right_triangle') {
       var a = parseFloat(d.a) || 3;
       var b = parseFloat(d.b) || 4;
       var unit = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
-        boundingbox: [-1, Math.max(a, b) + 1, Math.max(a, b) + 2, -1],
-        axis: false, showNavigation: false, showCopyright: false
-      });
-      var A = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 3 });
-      var B = currentBoard.create('point', [b, 0], { name: 'B', fixed: true, size: 3 });
-      var C = currentBoard.create('point', [0, a], { name: 'C', fixed: true, size: 3 });
+      var maxv = Math.max(a, b);
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
+        boundingbox: [-1, maxv + 1.5, maxv + 1.5, -1]
+      }));
+      var A = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 2 });
+      var B = currentBoard.create('point', [b, 0], { name: 'B', fixed: true, size: 2 });
+      var C = currentBoard.create('point', [0, a], { name: 'C', fixed: true, size: 2 });
       currentBoard.create('polygon', [A, B, C], {
         borders: { strokeColor: '#667eea', strokeWidth: 2 },
         fillColor: '#eef0fa', fillOpacity: 0.5,
         vertices: { visible: false }
       });
-      currentBoard.create('text', [b / 2, -0.6, 'b = ' + b + ' ' + unit], { fontSize: 13 });
-      currentBoard.create('text', [-1.2, a / 2, 'a = ' + a + ' ' + unit], { fontSize: 13 });
-      currentBoard.create('text', [b / 2, a / 2 + 0.5, 'c = ?'], { fontSize: 13 });
+      currentBoard.create('text', [b / 2, -0.7, 'b = ' + b + ' ' + unit], { fontSize: 11 });
+      currentBoard.create('text', [-1.3, a / 2, 'a = ' + a + ' ' + unit], { fontSize: 11 });
+      currentBoard.create('text', [b / 2, a / 2 + 0.6, 'c = ?'], { fontSize: 11 });
     } else if (type === 'rectangle') {
       var ra = parseFloat(d.a) || 5;
       var rb = parseFloat(d.b) || 3;
       var ru = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
-        boundingbox: [-1, ra + 1, rb + 1, -1],
-        axis: false, showNavigation: false, showCopyright: false
-      });
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
+        boundingbox: [-1, ra + 1.5, rb + 1.5, -1]
+      }));
       var P1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
       var P2 = currentBoard.create('point', [rb, 0], { name: '', fixed: true, visible: false });
       var P3 = currentBoard.create('point', [rb, ra], { name: '', fixed: true, visible: false });
@@ -590,15 +632,14 @@ function renderSketch(sketch) {
         fillColor: '#eef0fa', fillOpacity: 0.5,
         vertices: { visible: false }
       });
-      currentBoard.create('text', [rb / 2, -0.6, 'b = ' + rb + ' ' + ru], { fontSize: 13 });
-      currentBoard.create('text', [-1.2, ra / 2, 'a = ' + ra + ' ' + ru], { fontSize: 13 });
+      currentBoard.create('text', [rb / 2, -0.7, 'b = ' + rb + ' ' + ru], { fontSize: 11 });
+      currentBoard.create('text', [-1.3, ra / 2, 'a = ' + ra + ' ' + ru], { fontSize: 11 });
     } else if (type === 'square') {
       var sa = parseFloat(d.a) || 4;
       var su = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
-        boundingbox: [-1, sa + 1, sa + 1, -1],
-        axis: false, showNavigation: false, showCopyright: false
-      });
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
+        boundingbox: [-1, sa + 1.5, sa + 1.5, -1]
+      }));
       var S1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
       var S2 = currentBoard.create('point', [sa, 0], { name: '', fixed: true, visible: false });
       var S3 = currentBoard.create('point', [sa, sa], { name: '', fixed: true, visible: false });
@@ -608,50 +649,48 @@ function renderSketch(sketch) {
         fillColor: '#eef0fa', fillOpacity: 0.5,
         vertices: { visible: false }
       });
-      currentBoard.create('text', [sa / 2, -0.6, 'a = ' + sa + ' ' + su], { fontSize: 13 });
+      currentBoard.create('text', [sa / 2, -0.7, 'a = ' + sa + ' ' + su], { fontSize: 11 });
     } else if (type === 'circle') {
       var r = parseFloat(d.r) || 5;
       var cu = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
-        boundingbox: [-r - 1, r + 1, r + 1, -r - 1],
-        axis: false, showNavigation: false, showCopyright: false
-      });
-      var S = currentBoard.create('point', [0, 0], { name: 'S', fixed: true, size: 3 });
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
+        boundingbox: [-r - 1, r + 1, r + 1, -r - 1]
+      }));
+      var S = currentBoard.create('point', [0, 0], { name: 'S', fixed: true, size: 2 });
       currentBoard.create('circle', [S, r], {
         strokeColor: '#667eea', strokeWidth: 2, fillColor: '#eef0fa', fillOpacity: 0.3
       });
       currentBoard.create('segment', [S, [r, 0]], { strokeColor: '#e74c3c', strokeWidth: 2, dash: 2 });
-      currentBoard.create('text', [r / 2, 0.4, 'r = ' + r + ' ' + cu], { fontSize: 13 });
+      currentBoard.create('text', [r / 2, 0.4, 'r = ' + r + ' ' + cu], { fontSize: 11 });
     } else if (type === 'triangle') {
       var ta = parseFloat(d.a) || 5;
       var tb = parseFloat(d.b) || 6;
       var tc = parseFloat(d.c) || 7;
       var tu = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
-        boundingbox: [-1, Math.max(ta, tb, tc) + 1, Math.max(ta, tb, tc) + 1, -1],
-        axis: false, showNavigation: false, showCopyright: false
-      });
-      var T1 = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 3 });
-      var T2 = currentBoard.create('point', [tc, 0], { name: 'B', fixed: true, size: 3 });
-      var T3 = currentBoard.create('point', [ta * 0.5, tb * 0.8], { name: 'C', fixed: true, size: 3 });
+      var maxT = Math.max(ta, tb, tc);
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
+        boundingbox: [-1, maxT + 1.5, maxT + 1.5, -1]
+      }));
+      var T1 = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 2 });
+      var T2 = currentBoard.create('point', [tc, 0], { name: 'B', fixed: true, size: 2 });
+      var T3 = currentBoard.create('point', [ta * 0.5, tb * 0.8], { name: 'C', fixed: true, size: 2 });
       currentBoard.create('polygon', [T1, T2, T3], {
         borders: { strokeColor: '#667eea', strokeWidth: 2 },
         fillColor: '#eef0fa', fillOpacity: 0.5,
         vertices: { visible: false }
       });
-      currentBoard.create('text', [tc / 2, -0.6, 'c = ' + tc + ' ' + tu], { fontSize: 13 });
+      currentBoard.create('text', [tc / 2, -0.7, 'c = ' + tc + ' ' + tu], { fontSize: 11 });
     } else if (type === 'angle') {
       var alpha = parseFloat(d.alpha) || 45;
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
-        boundingbox: [-1, 5, 6, -1],
-        axis: false, showNavigation: false, showCopyright: false
-      });
-      var V = currentBoard.create('point', [0, 0], { name: 'V', fixed: true, size: 3 });
-      var A = currentBoard.create('point', [5, 0], { name: 'A', fixed: true, size: 3 });
-      var B = currentBoard.create('point', [5 * Math.cos(alpha * Math.PI / 180), 5 * Math.sin(alpha * Math.PI / 180)], { name: 'B', fixed: true, size: 3 });
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, {
+        boundingbox: [-1, 5, 6, -1]
+      }));
+      var V = currentBoard.create('point', [0, 0], { name: 'V', fixed: true, size: 2 });
+      var A = currentBoard.create('point', [5, 0], { name: 'A', fixed: true, size: 2 });
+      var B = currentBoard.create('point', [5 * Math.cos(alpha * Math.PI / 180), 5 * Math.sin(alpha * Math.PI / 180)], { name: 'B', fixed: true, size: 2 });
       currentBoard.create('segment', [V, A], { strokeColor: '#667eea', strokeWidth: 2 });
       currentBoard.create('segment', [V, B], { strokeColor: '#667eea', strokeWidth: 2 });
-      currentBoard.create('text', [2.5, -0.6, 'α = ' + alpha + '°'], { fontSize: 13 });
+      currentBoard.create('text', [2.5, -0.6, 'α = ' + alpha + '°'], { fontSize: 11 });
     }
   } catch (e) {
     console.warn('Napaka pri risanju skice:', e);
@@ -1086,7 +1125,6 @@ function addStudent() {
     });
 }
 
-/* ---- UREJANJE UČENCA (modal) ---- */
 function openStudentEdit(username) {
   var s = studentsList.find(x => x.username === username);
   if (!s) return;
