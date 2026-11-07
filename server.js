@@ -29,7 +29,6 @@ if (!process.env.MONGODB_URI) {
    ============================================================ */
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Odstrani podvojene backslashe (\\frac -> \frac)
 function normalizeLatex(s) {
   if (!s) return s;
   return String(s).replace(/\\\\/g, '\\');
@@ -221,6 +220,7 @@ function strictLevelRules(grade, topic) {
   const isPotence = t.includes('potenc') || t.includes('koren');
   const isOdstotki = t.includes('odstot');
   const isEnacbe = t.includes('enačb') || t.includes('enacb');
+  const isGeometrija = t.includes('geometr') || t.includes('pitagor') || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat');
 
   if (isCelaStevila) {
     return {
@@ -274,6 +274,15 @@ function strictLevelRules(grade, topic) {
       3: 'enačba z neznanko na obeh straneh (npr. 2x + 1 = x + 5).',
       4: 'enačba z oklepaji.',
       5: 'besedilna naloga, ki vodi v enačbo.'
+    };
+  }
+  if (isGeometrija) {
+    return {
+      1: 'osnovni pojem (npr. prepoznaj lik, izmeri dolžino, obseg kvadrata).',
+      2: 'enostaven izračun (npr. obseg pravokotnika, ploščina kvadrata).',
+      3: 'Pitagorov izrek z enostavnimi števili ali ploščina trikotnika.',
+      4: 'Pitagorov izrek v besedilni nalogi ali ploščina zahtevnejšega lika.',
+      5: 'kombinirana geometrijska naloga (npr. prostornina telesa, več korakov).'
     };
   }
 
@@ -357,7 +366,7 @@ async function callAI(prompt, maxAttempts = 6) {
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0.8,
-        max_tokens: 900
+        max_tokens: 1000
       });
       if (r && r._response && r._response.headers) updateQuotaFromHeaders(r._response.headers);
       return r;
@@ -642,6 +651,7 @@ app.post('/api/start-session', (req, res) => {
     hasCurrentTask: !!sess.currentTask && !sess.finished,
     currentTask: sess.currentTask && !sess.finished ? {
       question: sess.currentTask.question,
+      sketch: sess.currentTask.sketch || null,
       level: sess.currentTask.level,
       awaitingNext: sess.awaitingNext
     } : null
@@ -679,6 +689,12 @@ app.post('/api/generate-task', async (req, res) => {
 
   const level = sess.level;
   const grade = ch.grade;
+  const topicLower = (ch.topic || ch.title || '').toLowerCase();
+  const isGeometry = topicLower.includes('geometr') || topicLower.includes('pitagor') ||
+                     topicLower.includes('krog') || topicLower.includes('kot') ||
+                     topicLower.includes('trikot') || topicLower.includes('lik') ||
+                     topicLower.includes('telo') || topicLower.includes('koordinat');
+
   const strictRules = strictLevelRules(grade, ch.topic || ch.title);
   const levelDesc = strictRules[level] || strictRules[3];
   const seed = username + '_' + Date.now() + '_' + Math.random();
@@ -693,6 +709,25 @@ app.post('/api/generate-task', async (req, res) => {
     ? Array.from(new Set(recentNumbers.map(n => n.toFixed(2)))).join(', ')
     : '(še ni bilo nalog)';
 
+  let sketchInstruction = '';
+  if (isGeometry) {
+    sketchInstruction = `
+⚠️ SKICA (za to temo je skica SMISELNA):
+- Naloga naj bo takšna, da jo je mogoče narisati.
+- V polje "sketch" vrni JSON objekt z opisom skice. Možni tipi:
+  * {"type":"right_triangle","data":{"a":8,"b":15,"unit":"cm"}} – pravokotni trikotnik s katetama a in b.
+  * {"type":"triangle","data":{"a":5,"b":6,"c":7,"unit":"cm"}} – trikotnik s tremi stranicami.
+  * {"type":"rectangle","data":{"a":5,"b":3,"unit":"cm"}} – pravokotnik.
+  * {"type":"square","data":{"a":4,"unit":"cm"}} – kvadrat.
+  * {"type":"circle","data":{"r":5,"unit":"cm"}} – krožnica s polmerom r.
+  * {"type":"angle","data":{"alpha":45,"beta":60,"unit":"°"}} – kot.
+- Če skica ni smiselna za to nalogo, vrni "sketch": null.
+- Podatki v "data" naj ustrezajo besedilu naloge.
+`;
+  } else {
+    sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
+  }
+
   let prompt = `Si matematični tutor za učence ${grade}. razreda OŠ v Sloveniji.
 USTVARJAŠ NALOGO ZA KONKRETNEGA UČENCA (uporabniško ime: ${username}, seme: ${seed}).
 Tema sklopa: "${ch.topic || ch.title}".
@@ -701,25 +736,24 @@ Raven: ${level}/5.
 
 ⚠️ ZELO POMEMBNO – PRIMERNOST ZA RAZRED ${grade}:
 - Naloga MORA biti ustrezna za ${grade}. razred osnovne šole po slovenskem učnem načrtu.
-- Preden oblikuješ nalogo, PREVERI, ali so vsebina, števila in zahtevnost primerni za ${grade}. razred.
-- Zgleduj se po slovenskih i-učbenikih za matematiko (i-učbeniki so prosto dostopni na eucbeniki.sio.si).
-- Če naloga ne bi bila primerna za ${grade}. razred, jo spremeni, preden jo vrneš.
+- Zgleduj se po slovenskih i-učbenikih za matematiko (npr. i-učbenik Matematika 8, poglavja o Pitagorovem izreku, krožnici, kotih) in po tipičnih nalogah, ki jih učenci ${grade}. razreda rešujejo.
+- Naloga naj ima jasno besedilo, ne le goli račun, kadar je to smiselno.
 - Naloga mora ustrezati ravni ${level}/5: ${levelDesc}.
+
+${sketchInstruction}
 
 ⚠️ STROGO PRAVILO O TIPU NALOGE:
 - Tip naloge mora ustrezati temi "${ch.topic || ch.title}".
-- Če tema vsebuje "cela števila", "negativna števila" ali "predznak", NE uporabi ulomkov, decimalnih števil ali potenc. Uporabi SAMO cela števila.
+- Če tema vsebuje "cela števila", NE uporabi ulomkov ali decimalnih števil.
 - Če tema vsebuje "ulomke", uporabi ulomke.
 - Če tema vsebuje "decimalna števila", uporabi decimalna števila.
 - Če tema vsebuje "potence" ali "korene", uporabi potence ali korene.
 - Če tema vsebuje "odstotke", uporabi odstotke.
 - Ne mešaj tipov nalog, ki ne sodijo v temo.
-- Raven 1 = najlažje, Raven 5 = najtežje. Naloga mora biti TOČNO na izbrani ravni.
 
-⚠️ POMEMBNO – RAZNOLIKOST:
+⚠️ RAZNOLIKOST:
 - Naloga mora biti RAZLIČNA od vseh spodaj naštetih prejšnjih nalog.
 - Prepovedano je uporabiti ISTA ŠTEVILA kot v katerikoli prejšnji nalogi.
-- Prepovedano je uporabiti ENAKO STRUKTURO z istimi števili.
 - Znotraj istega sklopa naj bodo naloge čim bolj raznolike.
 
 PREJŠNJE NALOGE (izogibaj se jim):
@@ -730,7 +764,6 @@ ${recentNumsList}
 
 PRAVILA ZA NALOGO:
 - Generiraj NATANKO ENO nalogo, edinstveno za tega učenca.
-- Naloga naj bo kratka – lahko je SAMO RAČUN ali kratka besedilna naloga.
 - Uporabi LaTeX za matematične izraze: ulomki kot \\frac{a}{b}, potence kot x^{2}, koreni kot \\sqrt{x}, decimalna vejica kot 0{,}5.
 - V polju "answer_latex" uporabi ENAK zapis kot v besedilu naloge (en backslash pred \\frac).
 - Naloga naj bo v slovenščini, primerna ${grade}. razredu.
@@ -740,7 +773,8 @@ Vrni izključno JSON:
 {
   "question": "kratek prikaz naloge v LaTeX/tekstu",
   "answer": 0.75,
-  "answer_latex": "\\\\frac{3}{4}"
+  "answer_latex": "\\\\frac{3}{4}",
+  "sketch": null
 }`;
 
   if (isRetry && sess.currentTask) {
@@ -764,7 +798,8 @@ Vrni izključno JSON:
       const candidate = {
         question: normalizeLatex(data.question),
         answer: ansNum,
-        answerRaw: normalizeLatex(data.answer_latex || String(data.answer))
+        answerRaw: normalizeLatex(data.answer_latex || String(data.answer)),
+        sketch: data.sketch || null
       };
 
       if (!taskTypeAllowed(candidate.question, ch.topic || ch.title)) {
@@ -786,7 +821,8 @@ Vrni izključno JSON:
       finalData = {
         question: normalizeLatex(data.question),
         answer: ansNum,
-        answerRaw: normalizeLatex(data.answer_latex || String(data.answer))
+        answerRaw: normalizeLatex(data.answer_latex || String(data.answer)),
+        sketch: data.sketch || null
       };
     }
 
@@ -794,6 +830,7 @@ Vrni izključno JSON:
       question: finalData.question,
       answer: finalData.answer,
       answerRaw: finalData.answerRaw,
+      sketch: finalData.sketch,
       level
     };
     sess.awaitingNext = false;
@@ -803,6 +840,7 @@ Vrni izključno JSON:
 
     res.json({
       question: finalData.question,
+      sketch: finalData.sketch,
       level, correct: sess.correct, target: 5, grade
     });
   } catch (err) {
