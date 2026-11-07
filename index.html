@@ -5,24 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Matematični tutor</title>
 <script>
-  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      processEscapes: true,
+      processEnvironments: true
+    },
+    svg: { fontCache: 'global' }
+  };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js"></script>
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraph.css" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 20px; }
-  .card { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 40px; width: 100%; max-width: 1000px; margin: 20px 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh; display: flex; justify-content: center;
+    align-items: flex-start; padding: 20px;
+  }
+  .card {
+    background: white; border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 40px; width: 100%; max-width: 1000px; margin: 20px 0;
+  }
   h1 { color: #333; margin-bottom: 10px; font-size: 26px; }
   h2 { color: #555; margin-bottom: 20px; font-size: 20px; }
   h3 { color: #555; font-size: 17px; margin-bottom: 12px; }
   .subtitle { color: #777; margin-bottom: 25px; font-size: 14px; }
   input, button, select, textarea { font-family: inherit; font-size: 15px; }
-  input, select, textarea { width: 100%; padding: 12px 15px; border: 2px solid #ddd; border-radius: 10px; margin-bottom: 12px; background: white; }
-  textarea { resize: vertical; min-height: 80px; }
+  input, select, textarea {
+    width: 100%; padding: 12px 15px; border: 2px solid #ddd;
+    border-radius: 10px; margin-bottom: 12px; background: white;
+  }
   input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
-  button { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 12px 24px; border-radius: 10px; cursor: pointer; font-weight: 600; transition: transform 0.15s, box-shadow 0.15s; width: 100%; }
+  button {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white; border: none; padding: 12px 24px;
+    border-radius: 10px; cursor: pointer; font-weight: 600;
+    transition: transform 0.15s, box-shadow 0.15s; width: 100%;
+  }
   button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,0.4); }
   button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
   button.secondary { background: #f0f0f5; color: #555; width: auto; padding: 8px 16px; font-size: 14px; }
@@ -32,10 +56,20 @@
   button.small { padding: 6px 12px; font-size: 13px; width: auto; }
   .error { color: #e74c3c; font-size: 14px; margin-bottom: 12px; min-height: 18px; }
   .hidden { display: none !important; }
-  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #f0f0f5; gap: 10px; flex-wrap: wrap; }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 25px; padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f5; gap: 10px; flex-wrap: wrap;
+  }
   .header h2 { margin: 0; }
   .user-info { font-size: 14px; color: #777; }
-  .chapter { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #f8f9fc; border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s, transform 0.15s; border-left: 4px solid #667eea; }
+  .chapter {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; background: #f8f9fc; border-radius: 12px;
+    margin-bottom: 10px; cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    border-left: 4px solid #667eea;
+  }
   .chapter.locked { opacity: 0.6; cursor: not-allowed; border-left-color: #e74c3c; }
   .chapter.utrjevanje { border-left-color: #27ae60; }
   .chapter:hover { background: #eef0fa; transform: translateX(4px); }
@@ -43,39 +77,64 @@
   .chapter-title { font-weight: 600; color: #333; }
   .chapter-desc { font-size: 13px; color: #888; margin-top: 3px; }
   .chapter-deadline { font-size: 12px; color: #e67e22; margin-top: 4px; }
-  .badge { display: inline-block; color: white; font-size: 11px; padding: 2px 8px; border-radius: 8px; margin-left: 6px; vertical-align: middle; font-weight: 600; }
+  .badge {
+    display: inline-block; color: white; font-size: 11px;
+    padding: 2px 8px; border-radius: 8px; margin-left: 6px;
+    vertical-align: middle; font-weight: 600;
+  }
   .badge-grade { background: #f39c12; }
   .badge-cat-domaca { background: #3498db; }
   .badge-cat-utrjevanje { background: #27ae60; }
   .big-btn-row { display: flex; gap: 14px; margin: 20px 0; flex-wrap: wrap; }
-  .big-btn { flex: 1; min-width: 220px; padding: 28px 24px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 16px; cursor: pointer; font-weight: 700; font-size: 20px; transition: transform 0.15s, box-shadow 0.15s; text-align: center; }
+  .big-btn {
+    flex: 1; min-width: 220px; padding: 28px 24px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white; border: none; border-radius: 16px;
+    cursor: pointer; font-weight: 700; font-size: 20px;
+    transition: transform 0.15s, box-shadow 0.15s; text-align: center;
+  }
   .big-btn.domaca { background: linear-gradient(135deg, #3498db, #2980b9); }
   .big-btn.utrjevanje { background: linear-gradient(135deg, #27ae60, #16a085); }
   .big-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.25); }
   .big-btn .sub { font-size: 13px; opacity: 0.9; font-weight: 500; margin-top: 6px; display: block; }
   .task-box { background: #f8f9fc; border-radius: 12px; padding: 22px; margin: 20px 0; }
-  .task-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-  .task-left { flex: 1 1 300px; min-width: 260px; }
-  .task-right { flex: 0 0 auto; width: 380px; max-width: 100%; }
-  .task-text { font-size: 20px; font-weight: 600; color: #333; line-height: 1.6; margin-bottom: 14px; }
-  .task-text .mjx-container { font-size: 130% !important; }
-  .sketch-box { background: white; border-radius: 10px; padding: 8px; border: 1px solid #e0e0ea; }
-  #jxgbox { width: 100%; height: 300px; aspect-ratio: 4 / 3; max-height: 300px; }
-  @media (max-width: 720px) { .task-layout { flex-direction: column; } .task-right { width: 100%; } #jxgbox { height: 260px; } }
+  .task-text {
+    font-size: 26px; font-weight: 600; color: #333; margin-bottom: 20px;
+    line-height: 1.6; text-align: center; min-height: 40px;
+  }
+  .task-text .mjx-container { font-size: 140% !important; }
+  .sketch-box {
+    background: white; border-radius: 10px; padding: 10px;
+    margin-bottom: 16px; min-height: 320px;
+  }
+  .sketch-box .jxgbox { width: 100%; height: 300px; }
   .feedback { margin-top: 12px; font-size: 15px; line-height: 1.6; min-height: 22px; }
   .feedback.correct { color: #27ae60; font-weight: 600; }
   .feedback.wrong { color: #e74c3c; font-weight: 600; }
-  .explanation { background: #fff7e6; border-left: 4px solid #f39c12; border-radius: 8px; padding: 16px; margin-top: 14px; font-size: 14px; line-height: 1.8; color: #555; }
+  .explanation {
+    background: #fff7e6; border-left: 4px solid #f39c12;
+    border-radius: 8px; padding: 16px; margin-top: 14px;
+    font-size: 14px; line-height: 1.8; color: #555;
+  }
   .explanation ol { margin-left: 22px; margin-top: 8px; }
   .explanation li { margin-bottom: 8px; }
-  .explanation .correct-answer { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #f39c12; font-weight: 700; color: #d35400; font-size: 15px; }
+  .explanation .correct-answer {
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed #f39c12;
+    font-weight: 700; color: #d35400; font-size: 15px;
+  }
   .row { display: flex; gap: 10px; }
   .row input { margin-bottom: 0; }
-  .progress { font-size: 13px; color: #888; margin-bottom: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .progress {
+    font-size: 13px; color: #888; margin-bottom: 10px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
   .btn-row { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
   .btn-row button { width: auto; flex: 1; min-width: 120px; }
   .logout { background: #e74c3c; width: auto; padding: 8px 16px; font-size: 14px; }
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
   .stat-card { background: linear-gradient(135deg, #f8f9fc, #eef0fa); border-radius: 12px; padding: 16px; text-align: center; }
   .stat-card .num { font-size: 24px; font-weight: 700; color: #667eea; }
   .stat-card .lbl { font-size: 12px; color: #777; margin-top: 4px; }
@@ -91,46 +150,93 @@
   .pct.bad { color: #e74c3c; }
   .detail-box { background: #f8f9fc; border-radius: 10px; padding: 16px; margin-top: 12px; }
   .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
-  .tab { width: auto; padding: 9px 16px; font-size: 14px; background: #f0f0f5; color: #666; border-radius: 10px; cursor: pointer; font-weight: 600; border: none; }
+  .tab {
+    width: auto; padding: 9px 16px; font-size: 14px;
+    background: #f0f0f5; color: #666; border-radius: 10px;
+    cursor: pointer; font-weight: 600; border: none;
+  }
   .tab.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
   .empty-note { color: #999; font-size: 14px; padding: 16px; text-align: center; }
   .type-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #555; }
-  .error-item { background: #fff5f5; border-left: 3px solid #e74c3c; padding: 8px 12px; margin-bottom: 6px; font-size: 13px; border-radius: 6px; }
+  .type-row .type-pct { font-weight: 700; }
+  .error-item {
+    background: #fff5f5; border-left: 3px solid #e74c3c;
+    padding: 8px 12px; margin-bottom: 6px; font-size: 13px; border-radius: 6px;
+  }
+  .analysis-text {
+    background: #f0f7ff; border-left: 4px solid #3498db;
+    padding: 14px 16px; margin: 12px 0; border-radius: 8px;
+    font-size: 14px; line-height: 1.7; color: #2c3e50;
+  }
   .loading { color: #667eea; font-size: 14px; font-style: italic; }
-  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ddd; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid #ddd; border-top-color: #667eea;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .resume-banner { background: #e8f5e9; border-left: 4px solid #27ae60; padding: 12px 16px; margin-bottom: 16px; border-radius: 8px; font-size: 14px; color: #2e7d32; }
+  .resume-banner {
+    background: #e8f5e9; border-left: 4px solid #27ae60;
+    padding: 12px 16px; margin-bottom: 16px; border-radius: 8px;
+    font-size: 14px; color: #2e7d32;
+  }
   .settings-box { background: #fff8e1; border-left: 4px solid #f39c12; padding: 18px; border-radius: 10px; margin-bottom: 16px; }
-  .history-item { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #eee; }
+  .history-item {
+    display: flex; justify-content: space-between; gap: 10px;
+    font-size: 12px; padding: 6px 0; border-bottom: 1px solid #eee;
+  }
   .history-item.ok { color: #27ae60; }
   .history-item.fail { color: #e74c3c; }
   .history-q { flex: 1; }
   .badge-ok { background: #27ae60; color: white; padding: 1px 6px; border-radius: 6px; font-size: 11px; }
   .badge-fail { background: #e74c3c; color: white; padding: 1px 6px; border-radius: 6px; font-size: 11px; }
-  .grade-group { background: #f8f9fc; border-radius: 12px; margin-bottom: 12px; border-left: 4px solid #667eea; overflow: hidden; }
-  .grade-group summary { padding: 14px 18px; cursor: pointer; font-weight: 700; color: #333; font-size: 16px; display: flex; justify-content: space-between; align-items: center; user-select: none; outline: none; list-style: none; }
+  .grade-group {
+    background: #f8f9fc; border-radius: 12px;
+    margin-bottom: 12px; border-left: 4px solid #667eea;
+    overflow: hidden;
+  }
+  .grade-group summary {
+    padding: 14px 18px; cursor: pointer;
+    font-weight: 700; color: #333; font-size: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    user-select: none; outline: none; list-style: none;
+  }
   .grade-group summary::-webkit-details-marker { display: none; }
-  .grade-group summary::after { content: '▾'; font-size: 14px; color: #667eea; transition: transform 0.2s; }
+  .grade-group summary::after {
+    content: '▾'; font-size: 14px; color: #667eea;
+    transition: transform 0.2s;
+  }
   .grade-group[open] summary::after { transform: rotate(180deg); }
   .grade-group summary:hover { background: #eef0fa; }
   .grade-group .grade-body { padding: 4px 12px 12px 12px; }
   .chapter-actions { display: flex; gap: 6px; align-items: center; }
-  .chapter-actions button { width: auto; padding: 6px 10px; font-size: 13px; background: #f0f0f5; color: #555; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; }
+  .chapter-actions button {
+    width: auto; padding: 6px 10px; font-size: 13px;
+    background: #f0f0f5; color: #555; border-radius: 8px;
+    font-weight: 600; border: none; cursor: pointer;
+  }
   .chapter-actions button:hover { background: #e0e0ea; transform: none; box-shadow: none; }
   .chapter-actions button.del { background: #fdecea; color: #c0392b; }
   .chapter-actions button.del:hover { background: #f9d6d1; }
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
-  .modal-box { background: white; border-radius: 16px; padding: 28px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px;
+  }
+  .modal-box {
+    background: white; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
   .modal-box h3 { margin-bottom: 16px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
   .modal-actions button { flex: 1; }
   .answer-block { margin-bottom: 10px; }
-  .answer-block label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; font-weight: 600; }
-  .field-hint { font-size: 12px; color: #999; margin-top: -8px; margin-bottom: 12px; }
-  .level-indicator { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
-  .level-pill { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; background: #f0f0f5; color: #888; }
-  .level-pill.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-  .level-pill.done { background: #d4edda; color: #27ae60; }
+  .answer-block label {
+    display: block; font-size: 13px; color: #666;
+    margin-bottom: 4px; font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -140,10 +246,14 @@
   <div id="loginView">
     <h1>📐 Matematični tutor</h1>
     <p class="subtitle">Prijavi se s svojim uporabniškim imenom in geslom.</p>
-    <input id="loginUser" placeholder="Uporabniško ime">
-    <input id="loginPass" type="password" placeholder="Geslo" onkeydown="if(event.key==='Enter') login()">
+    <input id="loginUser" placeholder="Uporabniško ime" autocomplete="username">
+    <input id="loginPass" type="password" placeholder="Geslo" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter') login()">
     <div class="error" id="loginError"></div>
     <button onclick="login()">Prijava</button>
+    <p style="margin-top:18px; font-size:13px; color:#aaa;">
+      Učitelj: <b>ucitelj</b> / <b>ucitelj123</b>
+    </p>
   </div>
 
   <!-- UČENEC: DOMOV -->
@@ -157,8 +267,14 @@
     </div>
     <h3>Kaj želiš reševati?</h3>
     <div class="big-btn-row">
-      <button class="big-btn domaca" onclick="openCategory('domaca')">📘 Domače naloge<span class="sub">Časovno omejene naloge</span></button>
-      <button class="big-btn utrjevanje" onclick="openCategory('utrjevanje')">🏋️ Utrjevanje<span class="sub">Vedno odprte naloge</span></button>
+      <button class="big-btn domaca" onclick="openCategory('domaca')">
+        📘 Domače naloge
+        <span class="sub">Časovno omejene naloge</span>
+      </button>
+      <button class="big-btn utrjevanje" onclick="openCategory('utrjevanje')">
+        🏋️ Utrjevanje
+        <span class="sub">Vedno odprte naloge</span>
+      </button>
     </div>
     <button class="secondary" onclick="openStudentAnalysis()" style="margin-top:10px;">📊 Moja analiza</button>
   </div>
@@ -187,6 +303,7 @@
       </div>
       <button class="logout" onclick="logout()">Odjava</button>
     </div>
+
     <div class="tabs">
       <button class="tab active" onclick="switchTeacherTab('students', event)">👥 Učenci</button>
       <button class="tab" onclick="switchTeacherTab('chapters', event)">📚 Sklopi</button>
@@ -208,6 +325,7 @@
       </div>
       <div class="error" id="studentError"></div>
       <div id="newStudentResult" class="hidden" style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:12px;"></div>
+
       <h3 style="margin-top:20px;">Seznam učencev</h3>
       <div class="row" style="margin-bottom:10px;flex-wrap:wrap;">
         <select id="filterGrade" onchange="renderStudentsList()" style="max-width:200px;">
@@ -224,24 +342,28 @@
 
     <div id="teacherChapters" class="hidden">
       <h3>Dodaj sklop</h3>
-      <input id="newChapterTitle" placeholder="Naslov sklopa (npr. Vaja: seštevanje do 20)">
-      <select id="newChapterGrade" onchange="onNewGradeChange()">
+      <input id="newChapterTitle" placeholder="Naslov sklopa">
+      <input id="newChapterDesc" placeholder="Kratek opis (neobvezno)">
+      <select id="newChapterType" onchange="toggleTopicField()">
+        <option value="llm">LLM tutor (poljubna tema prek Groq)</option>
+        <option value="cela_stevila">Cela števila (vgrajen generator)</option>
+        <option value="generic">Splošno (brez tutorja)</option>
+      </select>
+      <select id="newChapterGrade">
         <option value="6">6. razred</option>
         <option value="7">7. razred</option>
         <option value="8" selected>8. razred</option>
         <option value="9">9. razred</option>
       </select>
-      <select id="newChapterTopic">
-        <option value="">— izberi temo —</option>
-      </select>
-      <div class="field-hint" id="newTopicHint"></div>
       <select id="newChapterCategory" onchange="toggleDeadlineField()">
         <option value="domaca">Domača naloga (časovno omejeno)</option>
         <option value="utrjevanje">Utrjevanje (vedno odprto)</option>
       </select>
       <input id="newChapterDeadline" type="datetime-local">
+      <input id="newChapterTopic" placeholder="Tema za LLM (npr. Pitagorov izrek, Ulomki)">
       <button class="secondary" onclick="addChapter()">+ Dodaj sklop</button>
       <div class="error" id="chapterError" style="margin-top:8px;"></div>
+
       <h3 style="margin-top:24px;">Vsi sklopi</h3>
       <div id="teacherChapterList"></div>
     </div>
@@ -267,21 +389,24 @@
     </div>
     <div class="settings-box">
       <input id="editTitle" placeholder="Naslov">
-      <select id="editGrade" onchange="onEditGradeChange()">
+      <input id="editDesc" placeholder="Opis">
+      <select id="editType">
+        <option value="llm">LLM tutor</option>
+        <option value="cela_stevila">Cela števila</option>
+        <option value="generic">Splošno</option>
+      </select>
+      <select id="editGrade">
         <option value="6">6. razred</option>
         <option value="7">7. razred</option>
         <option value="8">8. razred</option>
         <option value="9">9. razred</option>
       </select>
-      <select id="editTopic">
-        <option value="">— izberi temo —</option>
-      </select>
-      <div class="field-hint" id="editTopicHint"></div>
       <select id="editCategory" onchange="toggleEditDeadline()">
         <option value="domaca">Domača naloga</option>
         <option value="utrjevanje">Utrjevanje</option>
       </select>
       <input id="editDeadline" type="datetime-local">
+      <input id="editTopic" placeholder="Tema za LLM">
       <div class="row" style="margin-top:10px;">
         <button class="success" onclick="saveChapterSettings()" style="flex:1;">💾 Shrani</button>
         <button class="danger" onclick="deleteChapterSettings()" style="flex:0 0 auto;">🗑️ Izbriši</button>
@@ -312,28 +437,21 @@
       <button class="secondary" onclick="backToStudentList()">← Nazaj</button>
     </div>
     <div id="resumeBanner" class="resume-banner hidden"></div>
-    <div class="level-indicator" id="levelIndicator"></div>
     <div class="progress">
       <span id="progressTasks"></span>
       <span id="progressStats"></span>
     </div>
     <div class="task-box">
-      <div class="task-layout">
-        <div class="task-left">
-          <div class="task-text" id="taskText"></div>
-          <div id="answersContainer"></div>
-          <div class="btn-row" style="margin-top:12px;">
-            <button style="width:auto; padding:12px 24px;" id="checkBtn" onclick="checkAnswer()">Preveri</button>
-          </div>
-          <div class="feedback" id="feedback"></div>
-          <div id="explanationBox"></div>
-        </div>
-        <div class="task-right">
-          <div id="sketchContainer" class="sketch-box hidden">
-            <div id="jxgbox"></div>
-          </div>
-        </div>
+      <div class="task-text" id="taskText"></div>
+      <div id="sketchContainer" class="sketch-box hidden">
+        <div id="jxgbox" class="jxgbox"></div>
       </div>
+      <div id="answersContainer"></div>
+      <div class="btn-row" style="margin-top:12px;">
+        <button style="width:auto; padding:12px 24px;" id="checkBtn" onclick="checkAnswer()">Preveri</button>
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div id="explanationBox"></div>
     </div>
     <div class="btn-row">
       <button class="secondary" id="retryBtn" onclick="retrySimilar()" style="display:none;">Poskusi s podobno nalogo →</button>
@@ -355,7 +473,7 @@
       <h3>✏️ Uredi učenca</h3>
       <input id="editFirstName" placeholder="Ime">
       <input id="editLastName" placeholder="Priimek">
-      <input id="editUsername" placeholder="Uporabniško ime">
+      <input id="editUsername" placeholder="Uporabniško ime (male črke in številke)">
       <input id="editPassword" placeholder="Geslo">
       <select id="editStudentGrade">
         <option value="6">6. razred</option>
@@ -379,9 +497,8 @@ var currentGrade = null;
 var currentCategory = null;
 var currentChapter = null;
 var currentTask = null;
-var llmState = { level: 1, correct: 0, progression: { level: 1, correctInLevel: 0 }, requiredInLevel: 2, awaitingNext: false };
+var llmState = { level: 1, correct: 0, target: 5, awaitingNext: false };
 var allChapters = [];
-var allTopics = [];
 var currentDetailUsername = null;
 var studentsList = [];
 var editingStudentUsername = null;
@@ -389,84 +506,157 @@ var currentBoard = null;
 
 function authHeaders() { return currentUser ? { 'x-admin-user': currentUser.username } : {}; }
 
+/* ============================================================
+   MATHJAX
+   ============================================================ */
 function normalizeLatex(text) {
   if (!text) return text;
-  let t = String(text).replace(/\\\\/g, '\\');
-  t = t.replace(/\\text\{([^{}]*)\}/g, '$1');
-  return t;
+  return String(text).replace(/\\\\/g, '\\');
 }
 
 async function renderMath(el) {
   if (!el) return;
-  if (window.MathJax && MathJax.startup && MathJax.startup.promise) { try { await MathJax.startup.promise; } catch (e) {} }
+  if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
+    try { await MathJax.startup.promise; } catch (e) {}
+  } else {
+    let waited = 0;
+    while ((!window.MathJax || !MathJax.startup || !MathJax.startup.promise) && waited < 5000) {
+      await new Promise(r => setTimeout(r, 100));
+      waited += 100;
+    }
+  }
   if (!window.MathJax || !MathJax.typesetPromise) return;
   try { await MathJax.typesetPromise([el]); } catch (e) {}
 }
 
+/* ============================================================
+   JSXGRAPH – risanje skic
+   ============================================================ */
 function clearSketch() {
   document.getElementById('sketchContainer').classList.add('hidden');
-  if (currentBoard) { try { JXG.JSXGraph.freeBoard(currentBoard); } catch (e) {} currentBoard = null; }
+  if (currentBoard) {
+    try { JXG.JSXGraph.freeBoard(currentBoard); } catch (e) {}
+    currentBoard = null;
+  }
   document.getElementById('jxgbox').innerHTML = '';
 }
 
 function renderSketch(sketch) {
   clearSketch();
   if (!sketch || !sketch.type) return;
+
   var container = document.getElementById('sketchContainer');
   container.classList.remove('hidden');
   var box = document.getElementById('jxgbox');
   box.innerHTML = '';
+
   try {
     var type = sketch.type;
     var d = sketch.data || {};
-    var common = { axis: false, showNavigation: false, showCopyright: false, keepaspectratio: true };
+
     if (type === 'right_triangle') {
-      var a = parseFloat(d.a) || 3, b = parseFloat(d.b) || 4, unit = d.unit || 'cm';
-      var maxv = Math.max(a, b);
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, maxv + 1.5, maxv + 1.5, -1] }));
-      var A = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 2 });
-      var B = currentBoard.create('point', [b, 0], { name: 'B', fixed: true, size: 2 });
-      var C = currentBoard.create('point', [0, a], { name: 'C', fixed: true, size: 2 });
-      currentBoard.create('polygon', [A, B, C], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
-      currentBoard.create('text', [b / 2, -0.7, 'b = ' + b + ' ' + unit], { fontSize: 11 });
-      currentBoard.create('text', [-1.3, a / 2, 'a = ' + a + ' ' + unit], { fontSize: 11 });
+      var a = parseFloat(d.a) || 3;
+      var b = parseFloat(d.b) || 4;
+      var unit = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, Math.max(a, b) + 1, Math.max(a, b) + 2, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var A = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 3 });
+      var B = currentBoard.create('point', [b, 0], { name: 'B', fixed: true, size: 3 });
+      var C = currentBoard.create('point', [0, a], { name: 'C', fixed: true, size: 3 });
+      currentBoard.create('polygon', [A, B, C], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [b / 2, -0.6, 'b = ' + b + ' ' + unit], { fontSize: 13 });
+      currentBoard.create('text', [-1.2, a / 2, 'a = ' + a + ' ' + unit], { fontSize: 13 });
+      currentBoard.create('text', [b / 2, a / 2 + 0.5, 'c = ?'], { fontSize: 13 });
     } else if (type === 'rectangle') {
-      var ra = parseFloat(d.a) || 5, rb = parseFloat(d.b) || 3, ru = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, ra + 1.5, rb + 1.5, -1] }));
+      var ra = parseFloat(d.a) || 5;
+      var rb = parseFloat(d.b) || 3;
+      var ru = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, ra + 1, rb + 1, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
       var P1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
       var P2 = currentBoard.create('point', [rb, 0], { name: '', fixed: true, visible: false });
       var P3 = currentBoard.create('point', [rb, ra], { name: '', fixed: true, visible: false });
       var P4 = currentBoard.create('point', [0, ra], { name: '', fixed: true, visible: false });
-      currentBoard.create('polygon', [P1, P2, P3, P4], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
-      currentBoard.create('text', [rb / 2, -0.7, 'b = ' + rb + ' ' + ru], { fontSize: 11 });
-      currentBoard.create('text', [-1.3, ra / 2, 'a = ' + ra + ' ' + ru], { fontSize: 11 });
+      currentBoard.create('polygon', [P1, P2, P3, P4], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [rb / 2, -0.6, 'b = ' + rb + ' ' + ru], { fontSize: 13 });
+      currentBoard.create('text', [-1.2, ra / 2, 'a = ' + ra + ' ' + ru], { fontSize: 13 });
     } else if (type === 'square') {
-      var sa = parseFloat(d.a) || 4, su = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, sa + 1.5, sa + 1.5, -1] }));
+      var sa = parseFloat(d.a) || 4;
+      var su = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, sa + 1, sa + 1, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
       var S1 = currentBoard.create('point', [0, 0], { name: '', fixed: true, visible: false });
       var S2 = currentBoard.create('point', [sa, 0], { name: '', fixed: true, visible: false });
       var S3 = currentBoard.create('point', [sa, sa], { name: '', fixed: true, visible: false });
       var S4 = currentBoard.create('point', [0, sa], { name: '', fixed: true, visible: false });
-      currentBoard.create('polygon', [S1, S2, S3, S4], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
-      currentBoard.create('text', [sa / 2, -0.7, 'a = ' + sa + ' ' + su], { fontSize: 11 });
+      currentBoard.create('polygon', [S1, S2, S3, S4], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [sa / 2, -0.6, 'a = ' + sa + ' ' + su], { fontSize: 13 });
     } else if (type === 'circle') {
-      var r = parseFloat(d.r) || 5, cu = d.unit || 'cm';
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-r - 1, r + 1, r + 1, -r - 1] }));
-      var S = currentBoard.create('point', [0, 0], { name: 'S', fixed: true, size: 2 });
-      currentBoard.create('circle', [S, r], { strokeColor: '#667eea', strokeWidth: 2, fillColor: '#eef0fa', fillOpacity: 0.3 });
+      var r = parseFloat(d.r) || 5;
+      var cu = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-r - 1, r + 1, r + 1, -r - 1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var S = currentBoard.create('point', [0, 0], { name: 'S', fixed: true, size: 3 });
+      currentBoard.create('circle', [S, r], {
+        strokeColor: '#667eea', strokeWidth: 2, fillColor: '#eef0fa', fillOpacity: 0.3
+      });
       currentBoard.create('segment', [S, [r, 0]], { strokeColor: '#e74c3c', strokeWidth: 2, dash: 2 });
-      currentBoard.create('text', [r / 2, 0.4, 'r = ' + r + ' ' + cu], { fontSize: 11 });
+      currentBoard.create('text', [r / 2, 0.4, 'r = ' + r + ' ' + cu], { fontSize: 13 });
     } else if (type === 'triangle') {
-      var ta = parseFloat(d.a) || 5, tb = parseFloat(d.b) || 6, tc = parseFloat(d.c) || 7, tu = d.unit || 'cm';
-      var maxT = Math.max(ta, tb, tc);
-      currentBoard = JXG.JSXGraph.initBoard('jxgbox', Object.assign({}, common, { boundingbox: [-1, maxT + 1.5, maxT + 1.5, -1] }));
-      var T1 = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 2 });
-      var T2 = currentBoard.create('point', [tc, 0], { name: 'B', fixed: true, size: 2 });
-      var T3 = currentBoard.create('point', [ta * 0.5, tb * 0.8], { name: 'C', fixed: true, size: 2 });
-      currentBoard.create('polygon', [T1, T2, T3], { borders: { strokeColor: '#667eea', strokeWidth: 2 }, fillColor: '#eef0fa', fillOpacity: 0.5, vertices: { visible: false } });
-      currentBoard.create('text', [tc / 2, -0.7, 'c = ' + tc + ' ' + tu], { fontSize: 11 });
+      var ta = parseFloat(d.a) || 5;
+      var tb = parseFloat(d.b) || 6;
+      var tc = parseFloat(d.c) || 7;
+      var tu = d.unit || 'cm';
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, Math.max(ta, tb, tc) + 1, Math.max(ta, tb, tc) + 1, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var T1 = currentBoard.create('point', [0, 0], { name: 'A', fixed: true, size: 3 });
+      var T2 = currentBoard.create('point', [tc, 0], { name: 'B', fixed: true, size: 3 });
+      var T3 = currentBoard.create('point', [ta * 0.5, tb * 0.8], { name: 'C', fixed: true, size: 3 });
+      currentBoard.create('polygon', [T1, T2, T3], {
+        borders: { strokeColor: '#667eea', strokeWidth: 2 },
+        fillColor: '#eef0fa', fillOpacity: 0.5,
+        vertices: { visible: false }
+      });
+      currentBoard.create('text', [tc / 2, -0.6, 'c = ' + tc + ' ' + tu], { fontSize: 13 });
+    } else if (type === 'angle') {
+      var alpha = parseFloat(d.alpha) || 45;
+      currentBoard = JXG.JSXGraph.initBoard('jxgbox', {
+        boundingbox: [-1, 5, 6, -1],
+        axis: false, showNavigation: false, showCopyright: false
+      });
+      var V = currentBoard.create('point', [0, 0], { name: 'V', fixed: true, size: 3 });
+      var A = currentBoard.create('point', [5, 0], { name: 'A', fixed: true, size: 3 });
+      var B = currentBoard.create('point', [5 * Math.cos(alpha * Math.PI / 180), 5 * Math.sin(alpha * Math.PI / 180)], { name: 'B', fixed: true, size: 3 });
+      currentBoard.create('segment', [V, A], { strokeColor: '#667eea', strokeWidth: 2 });
+      currentBoard.create('segment', [V, B], { strokeColor: '#667eea', strokeWidth: 2 });
+      currentBoard.create('text', [2.5, -0.6, 'α = ' + alpha + '°'], { fontSize: 13 });
     }
-  } catch (e) { console.warn('Napaka pri risanju skice:', e); clearSketch(); }
+  } catch (e) {
+    console.warn('Napaka pri risanju skice:', e);
+    clearSketch();
+  }
 }
 
 /* ============================================================
@@ -477,7 +667,10 @@ function login() {
   var p = document.getElementById('loginPass').value;
   var err = document.getElementById('loginError');
   err.textContent = '';
-  fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) })
+  fetch('/api/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: u, password: p })
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) { err.textContent = data.error; return; }
@@ -489,13 +682,17 @@ function login() {
     .catch(() => { err.textContent = 'Napaka pri povezavi.'; });
 }
 function logout() {
-  currentUser = null; currentGrade = null; currentCategory = null; currentChapter = null; currentTask = null;
-  allChapters = []; allTopics = []; currentDetailUsername = null; studentsList = []; editingStudentUsername = null;
+  currentUser = null; currentGrade = null; currentCategory = null;
+  currentChapter = null; currentTask = null; allChapters = [];
+  currentDetailUsername = null; studentsList = []; editingStudentUsername = null;
   clearSketch();
   document.getElementById('loginUser').value = '';
   document.getElementById('loginPass').value = '';
   document.getElementById('loginView').classList.remove('hidden');
-  ['studentHomeView','studentChaptersView','teacherHomeView','chapterSettingsView','studentDetailView','tutorView','studentAnalysisView','editStudentModal'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  ['studentHomeView','studentChaptersView','teacherHomeView','chapterSettingsView',
+   'studentDetailView','tutorView','studentAnalysisView','editStudentModal'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
 }
 
 /* ============================================================
@@ -504,7 +701,8 @@ function logout() {
 function showStudentHome() {
   document.getElementById('studentHomeView').classList.remove('hidden');
   document.getElementById('studentName').textContent = currentUser.firstName;
-  document.getElementById('studentInfo').textContent = currentUser.firstName + ' ' + currentUser.lastName + ' – ' + currentGrade + '. razred';
+  document.getElementById('studentInfo').textContent =
+    currentUser.firstName + ' ' + currentUser.lastName + ' – ' + currentGrade + '. razred';
 }
 function backToStudentHome() {
   ['studentChaptersView','tutorView','studentAnalysisView'].forEach(id => document.getElementById(id).classList.add('hidden'));
@@ -515,8 +713,10 @@ function openCategory(cat) {
   currentCategory = cat;
   document.getElementById('studentHomeView').classList.add('hidden');
   document.getElementById('studentChaptersView').classList.remove('hidden');
-  document.getElementById('categoryTitle').textContent = cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje';
+  document.getElementById('categoryTitle').textContent =
+    cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje';
   document.getElementById('categoryInfo').textContent = 'Razred: ' + currentGrade + '.';
+
   fetch('/api/chapters?grade=' + currentGrade, { cache: 'no-store' })
     .then(r => r.json())
     .then(list => { allChapters = list; renderStudentChapterList(); })
@@ -531,8 +731,10 @@ function renderStudentChapterList() {
     var locked = ch.category === 'domaca' && ch.deadline && Date.now() > new Date(ch.deadline).getTime();
     var div = document.createElement('div');
     div.className = 'chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje ' : '') + (locked ? 'locked' : '');
-    div.innerHTML = '<div class="chapter-left"><div class="chapter-title">' + ch.title + '</div></div>';
-    if (ch.deadline) div.innerHTML += '<div class="chapter-deadline">⏰ Rok: ' + new Date(ch.deadline).toLocaleString('sl-SI') + (locked ? ' (POTEKEL)' : '') + '</div>';
+    var html = '<div class="chapter-left"><div class="chapter-title">' + ch.title + '</div><div class="chapter-desc">' + (ch.desc || '') + '</div>';
+    if (ch.deadline) html += '<div class="chapter-deadline">⏰ Rok: ' + new Date(ch.deadline).toLocaleString('sl-SI') + (locked ? ' (POTEKEL)' : '') + '</div>';
+    html += '</div>';
+    div.innerHTML = html;
     if (!locked) div.onclick = () => openChapter(ch);
     else div.onclick = () => alert('Rok je potekel.');
     el.appendChild(div);
@@ -552,7 +754,7 @@ function openChapter(ch) {
   document.getElementById('studentChaptersView').classList.add('hidden');
   document.getElementById('tutorView').classList.remove('hidden');
   document.getElementById('tutorTitle').textContent = ch.title;
-  document.getElementById('tutorDesc').textContent = '';
+  document.getElementById('tutorDesc').textContent = ch.desc || '';
   document.getElementById('explanationBox').innerHTML = '';
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
@@ -563,53 +765,36 @@ function openChapter(ch) {
   document.getElementById('taskText').innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam ...</span>';
   document.getElementById('resumeBanner').classList.add('hidden');
   clearSketch();
-  updateLevelIndicator();
-  startOrResumeSession(ch);
-}
 
-function updateLevelIndicator() {
-  var el = document.getElementById('levelIndicator');
-  if (!el) return;
-  var prog = llmState.progression || { level: 1, correctInLevel: 0 };
-  var names = { 1: 'Osnovna', 2: 'Srednja', 3: 'Zahtevna' };
-  var html = '';
-  for (var lvl = 1; lvl <= 3; lvl++) {
-    var cls = 'level-pill';
-    if (lvl < prog.level) cls += ' done';
-    else if (lvl === prog.level) cls += ' active';
-    html += '<span class="' + cls + '">' + (lvl < prog.level ? '✓ ' : '') + names[lvl] + ' (' + lvl + '/3)</span>';
-  }
-  el.innerHTML = html;
+  if (ch.type === 'llm' || ch.type === 'cela_stevila') startOrResumeSession(ch);
+  else document.getElementById('taskText').textContent = 'Za to poglavje tutor še ni na voljo.';
 }
-
-function updateProgressUI_LLM() {
-  var prog = llmState.progression || { level: 1, correctInLevel: 0 };
-  var req = llmState.requiredInLevel || (prog.level === 3 ? 1 : 2);
-  var names = { 1: 'osnovna', 2: 'srednja', 3: 'zahtevna' };
-  document.getElementById('progressTasks').textContent = 'Stopnja ' + prog.level + '/3 (' + names[prog.level] + ')  •  ' + prog.correctInLevel + '/' + req + ' pravilnih';
-  document.getElementById('progressStats').textContent = currentChapter ? currentChapter.title : '';
-  updateLevelIndicator();
-}
-
 function startOrResumeSession(ch) {
-  fetch('/api/start-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username, chapterId: ch.id }) })
+  fetch('/api/start-session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, chapterId: ch.id })
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) { document.getElementById('taskText').textContent = 'Napaka: ' + data.error; return; }
       llmState.level = data.level || 1;
       llmState.correct = data.correct || 0;
-      llmState.progression = data.progression || { level: 1, correctInLevel: 0 };
-      llmState.requiredInLevel = data.requiredInLevel || (llmState.progression.level === 3 ? 1 : 2);
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
       if (data.hasCurrentTask && data.currentTask) {
-        currentTask = { question: data.currentTask.question, sketch: data.currentTask.sketch, answers: data.currentTask.answers };
+        currentTask = {
+          question: normalizeLatex(data.currentTask.question),
+          text: normalizeLatex(data.currentTask.question),
+          level: data.currentTask.level,
+          sketch: data.currentTask.sketch,
+          answers: data.currentTask.answers
+        };
         var tt = document.getElementById('taskText');
         tt.textContent = currentTask.question;
         renderMath(tt);
         if (currentTask.sketch) renderSketch(currentTask.sketch);
         renderAnswerFields(currentTask.answers);
         var banner = document.getElementById('resumeBanner');
-        banner.textContent = '↩️ Nadaljuješ, kjer si končal. Stopnja ' + llmState.progression.level + '/3.';
+        banner.textContent = '↩️ Nadaljuješ, kjer si končal. Pravilnih: ' + data.correct + '/5, raven: ' + data.level + '/5.';
         banner.classList.remove('hidden');
         if (data.currentTask.awaitingNext) {
           document.getElementById('answersContainer').querySelectorAll('input').forEach(i => i.disabled = true);
@@ -627,11 +812,16 @@ function startOrResumeSession(ch) {
     })
     .catch(() => { document.getElementById('taskText').textContent = 'Napaka pri povezavi.'; });
 }
-
+function updateProgressUI_LLM() {
+  document.getElementById('progressTasks').textContent = 'Pravilnih: ' + llmState.correct + ' / 5  •  Raven: ' + llmState.level + ' / 5';
+  document.getElementById('progressStats').textContent = currentChapter.title;
+}
 function renderAnswerFields(answers) {
   var cont = document.getElementById('answersContainer');
   cont.innerHTML = '';
-  if (!Array.isArray(answers) || !answers.length) answers = [{ label: 'Odgovor' }];
+  if (!Array.isArray(answers) || !answers.length) {
+    answers = [{ label: 'Odgovor', value: 0, latex: '' }];
+  }
   answers.forEach(function (a) {
     var wrap = document.createElement('div');
     wrap.className = 'answer-block';
@@ -650,10 +840,9 @@ function renderAnswerFields(answers) {
   var first = cont.querySelector('.answer-field');
   if (first) first.focus();
 }
-
 function loadLLMTask(isRetry) {
   var tt = document.getElementById('taskText');
-  tt.innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam nalogo ...</span>';
+  tt.innerHTML = '<span class="loading"><span class="spinner"></span>Pripravljam tvojo nalogo ...</span>';
   document.getElementById('answersContainer').innerHTML = '';
   document.getElementById('checkBtn').disabled = true;
   document.getElementById('checkBtn').style.display = '';
@@ -662,17 +851,25 @@ function loadLLMTask(isRetry) {
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   clearSketch();
-  fetch('/api/generate-task', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id, isRetry: !!isRetry }) })
+
+  fetch('/api/generate-task', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id, isRetry: !!isRetry })
+  })
     .then(r => r.json())
     .then(data => {
-      if (data.error) { tt.innerHTML = 'Napaka: ' + data.error; return; }
+      if (data.error) { tt.textContent = 'Napaka: ' + data.error; return; }
       if (data.finished) { showLLMFinished(data.correct, data.attempts); return; }
-      currentTask = { question: data.question, sketch: data.sketch, answers: data.answers };
+      currentTask = {
+        question: normalizeLatex(data.question),
+        text: normalizeLatex(data.question),
+        level: data.level,
+        sketch: data.sketch,
+        answers: data.answers
+      };
       llmState.level = data.level;
       llmState.correct = data.correct;
       llmState.awaitingNext = false;
-      if (data.progression) llmState.progression = data.progression;
-      if (data.requiredInLevel) llmState.requiredInLevel = data.requiredInLevel;
       tt.textContent = currentTask.question;
       renderMath(tt);
       if (currentTask.sketch) renderSketch(currentTask.sketch);
@@ -681,26 +878,26 @@ function loadLLMTask(isRetry) {
       document.getElementById('checkBtn').style.display = '';
       updateProgressUI_LLM();
     })
-    .catch(() => { tt.innerHTML = 'Napaka pri povezavi.'; });
+    .catch(() => { tt.textContent = 'Napaka pri povezavi.'; });
 }
-
 function showLLMFinished(correct, attempts) {
-  document.getElementById('taskText').textContent = '🎉 Bravo! Rešil si vse naloge na vseh treh stopnjah!';
+  document.getElementById('taskText').textContent = '🎉 Bravo! Rešil si vseh 5 nalog!';
   document.getElementById('progressTasks').textContent = 'Seja zaključena';
-  document.getElementById('progressStats').textContent = 'Pravilnih: ' + correct + '  •  Poskusov: ' + attempts;
+  document.getElementById('progressStats').textContent = 'Pravilnih: ' + correct + ' / 5  •  Poskusov: ' + attempts;
   document.getElementById('answersContainer').innerHTML = '';
   document.getElementById('checkBtn').style.display = 'none';
   document.getElementById('retryBtn').style.display = 'none';
   clearSketch();
-  if (llmState.progression) { llmState.progression.level = 3; llmState.progression.correctInLevel = llmState.requiredInLevel || 1; }
-  updateLevelIndicator();
-  document.getElementById('explanationBox').innerHTML = '<div style="text-align:center;margin-top:15px;"><button class="secondary" onclick="startFresh()">Nova seja</button></div>';
+  document.getElementById('explanationBox').innerHTML =
+    '<div style="text-align:center;margin-top:15px;">' +
+    '<button class="secondary" onclick="startFresh()">Nova seja</button></div>';
 }
 function startFresh() {
-  fetch('/api/reset-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id }) })
-    .then(() => { llmState.progression = { level: 1, correctInLevel: 0 }; llmState.requiredInLevel = 2; llmState.correct = 0; startOrResumeSession(currentChapter); });
+  fetch('/api/reset-session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, chapterId: currentChapter.id })
+  }).then(() => startOrResumeSession(currentChapter));
 }
-
 function checkAnswer() {
   if (!currentTask) return;
   var inputs = document.querySelectorAll('.answer-field');
@@ -711,57 +908,66 @@ function checkAnswer() {
     if (v === '') anyEmpty = true;
     userAnswers.push(v);
   }
-  if (anyEmpty) { document.getElementById('feedback').className = 'feedback wrong'; document.getElementById('feedback').textContent = 'Vnesi vse odgovore.'; return; }
+  if (anyEmpty) {
+    document.getElementById('feedback').className = 'feedback wrong';
+    document.getElementById('feedback').textContent = 'Vnesi vse odgovore.';
+    return;
+  }
   var fb = document.getElementById('feedback');
   inputs.forEach(function (inp) { inp.disabled = true; });
   document.getElementById('checkBtn').disabled = true;
   document.getElementById('checkBtn').style.display = 'none';
   fb.className = 'feedback';
-  fb.innerHTML = '<span class="loading"><span class="spinner"></span>Preverjam ...</span>';
-  fetch('/api/check-answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username, userAnswers: userAnswers }) })
+  fb.innerHTML = '<span class="loading"><span class="spinner"></span>Preverjam tvoje odgovore ...</span>';
+
+  fetch('/api/check-answer', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: currentUser.username, userAnswers: userAnswers })
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) { fb.className = 'feedback wrong'; fb.textContent = data.error; return; }
       if (data.finished) {
-        fb.className = 'feedback correct'; fb.textContent = '✅ ' + data.message;
-        if (data.progression) llmState.progression = data.progression;
-        if (data.requiredInLevel) llmState.requiredInLevel = data.requiredInLevel;
+        fb.className = 'feedback correct';
+        fb.textContent = '✅ ' + data.message;
         showLLMFinished(data.correctCount, data.attempts);
         return;
       }
       if (data.correct) {
-        fb.className = 'feedback correct'; fb.textContent = '✅ ' + data.message;
+        fb.className = 'feedback correct';
+        fb.textContent = '✅ ' + data.message;
         llmState.correct = data.correctCount;
-        if (data.progression) llmState.progression = data.progression;
-        if (data.requiredInLevel) llmState.requiredInLevel = data.requiredInLevel;
+        llmState.level = data.nextLevel;
         document.getElementById('explanationBox').innerHTML = '';
-        updateProgressUI_LLM();
         setTimeout(() => { loadLLMTask(false); }, 1300);
       } else {
-        fb.className = 'feedback wrong'; fb.textContent = '❌ ' + data.message;
+        fb.className = 'feedback wrong';
+        fb.textContent = '❌ ' + data.message;
         var box = document.getElementById('explanationBox');
         var html = '<div class="explanation"><b>Razlaga:</b>';
         if (Array.isArray(data.steps) && data.steps.length) {
           html += '<ol>';
-          data.steps.forEach(s => { html += '<li>' + s + '</li>'; });
+          data.steps.forEach(s => { html += '<li>' + normalizeLatex(s) + '</li>'; });
           html += '</ol>';
         }
         if (Array.isArray(data.correctAnswers)) {
-          html += '<div class="correct-answer">Pravilen odgovor: ';
-          data.correctAnswers.forEach(a => { html += '<b>' + (a.label || '') + ':</b> ' + a.latex + '  '; });
+          html += '<div class="correct-answer">Pravilni odgovori:<br>';
+          data.correctAnswers.forEach(a => {
+            html += '<b>' + a.label + ':</b> ' + normalizeLatex(a.latex) + '<br>';
+          });
           html += '</div>';
+        } else {
+          html += '<div class="correct-answer">Pravilen odgovor: ' + normalizeLatex(data.correctAnswerRaw || data.correctAnswer) + '</div>';
         }
         html += '</div>';
         box.innerHTML = html;
         renderMath(box);
         llmState.awaitingNext = true;
-        updateProgressUI_LLM();
         document.getElementById('retryBtn').style.display = '';
       }
     })
     .catch(() => { fb.className = 'feedback wrong'; fb.textContent = 'Napaka pri povezavi.'; });
 }
-
 function retrySimilar() {
   document.getElementById('retryBtn').style.display = 'none';
   document.getElementById('checkBtn').disabled = false;
@@ -787,17 +993,20 @@ function openStudentAnalysis() {
       var html = '';
       list.forEach(item => {
         html += '<div class="detail-box" style="margin-bottom:16px;">';
-        html += '<h3>' + item.title + '</h3>';
+        html += '<h3>' + item.title + ' <span class="badge badge-grade">' + item.grade + '. r</span>' +
+                '<span class="badge ' + (item.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+                (item.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span></h3>';
         html += '<div class="stats-grid">';
         html += '<div class="stat-card"><div class="num">' + item.total + '</div><div class="lbl">Poskusov</div></div>';
         html += '<div class="stat-card"><div class="num">' + item.correct + '</div><div class="lbl">Pravilnih</div></div>';
         html += '<div class="stat-card"><div class="num ' + pctClass(item.pct) + '">' + item.pct + '%</div><div class="lbl">Uspešnost</div></div>';
         html += '<div class="stat-card"><div class="num">' + item.correctFirst + '</div><div class="lbl">1. poskus</div></div>';
         html += '</div>';
-        if (item.topErrors && item.topErrors.length) {
+        if (item.topErrors.length) {
           html += '<h3 style="margin-top:16px;">Najpogostejše napake</h3>';
           item.topErrors.forEach(e => {
-            html += '<div class="error-item"><b>' + e.question + '</b><br>Tvoj odgovor: ' + e.userAns + ' • Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>';
+            html += '<div class="error-item"><b>' + normalizeLatex(e.question) + '</b><br>Tvoj odgovor: ' + e.userAns +
+                    ' • Pravilno: ' + normalizeLatex(e.correctAns) + ' • Ponovitve: ' + e.count + '</div>';
           });
         }
         html += '</div>';
@@ -820,15 +1029,20 @@ function switchTeacherTab(tab, ev) {
     Array.from(document.querySelectorAll('#teacherHomeView > .tabs .tab')).forEach(t => t.classList.remove('active'));
     ev.target.classList.add('active');
   }
-  ['teacherStudents','teacherChapters','teacherAnalysis','studentDetailView','chapterSettingsView'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  ['teacherStudents','teacherChapters','teacherAnalysis','studentDetailView','chapterSettingsView'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
   document.getElementById('teacherHomeView').classList.remove('hidden');
   if (tab === 'students') { document.getElementById('teacherStudents').classList.remove('hidden'); renderStudentsList(); }
-  else if (tab === 'chapters') { document.getElementById('teacherChapters').classList.remove('hidden'); loadTeacherChapters(); onNewGradeChange(); }
+  else if (tab === 'chapters') { document.getElementById('teacherChapters').classList.remove('hidden'); loadTeacherChapters(); }
   else { document.getElementById('teacherAnalysis').classList.remove('hidden'); switchAnalysis('grade'); }
 }
 
 function loadStudents() {
-  return fetch('/api/students', { headers: authHeaders() }).then(r => r.json()).then(list => { studentsList = list; renderStudentsList(); return list; }).catch(() => { studentsList = []; return []; });
+  return fetch('/api/students', { headers: authHeaders() })
+    .then(r => r.json())
+    .then(list => { studentsList = list; renderStudentsList(); return list; })
+    .catch(() => { studentsList = []; return []; });
 }
 function renderStudentsList() {
   var filterEl = document.getElementById('filterGrade');
@@ -838,20 +1052,28 @@ function renderStudentsList() {
   if (!filtered.length) { el.innerHTML = '<p class="empty-note">Ni učencev.</p>'; return; }
   var html = '<table><thead><tr><th>Ime in priimek</th><th>Razred</th><th>Uporabniško ime</th><th>Geslo</th><th>Dejanja</th></tr></thead><tbody>';
   filtered.forEach(s => {
-    html += '<tr><td>' + s.firstName + ' ' + s.lastName + '</td><td>' + s.grade + '. r</td><td><code>' + s.username + '</code></td><td><code>' + s.password + '</code></td>' +
-      '<td><button class="secondary small" onclick="openStudentEdit(\'' + s.username + '\')">✏️</button> <button class="danger small" onclick="deleteStudent(\'' + s.username + '\')">🗑️</button></td></tr>';
+    html += '<tr class="student-row">' +
+      '<td>' + s.firstName + ' ' + s.lastName + '</td>' +
+      '<td>' + s.grade + '. r</td>' +
+      '<td><code>' + s.username + '</code></td>' +
+      '<td><code>' + s.password + '</code></td>' +
+      '<td><button class="secondary small" onclick="openStudentEdit(\'' + s.username + '\')">✏️</button> ' +
+      '<button class="danger small" onclick="deleteStudent(\'' + s.username + '\')">🗑️</button></td></tr>';
   });
   html += '</tbody></table>';
   el.innerHTML = html;
 }
 function addStudent() {
-  var fn = document.getElementById('newFirstName').value.trim();
-  var ln = document.getElementById('newLastName').value.trim();
-  var g = document.getElementById('newGrade').value;
+  var firstName = document.getElementById('newFirstName').value.trim();
+  var lastName = document.getElementById('newLastName').value.trim();
+  var grade = document.getElementById('newGrade').value;
   var err = document.getElementById('studentError');
   err.textContent = '';
-  if (!fn || !ln) { err.textContent = 'Vnesi ime in priimek.'; return; }
-  fetch('/api/students', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()), body: JSON.stringify({ firstName: fn, lastName: ln, grade: g }) })
+  if (!firstName || !lastName) { err.textContent = 'Vnesi ime in priimek.'; return; }
+  fetch('/api/students', {
+    method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify({ firstName, lastName, grade })
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) { err.textContent = data.error; return; }
@@ -859,10 +1081,12 @@ function addStudent() {
       document.getElementById('newLastName').value = '';
       var res = document.getElementById('newStudentResult');
       res.classList.remove('hidden');
-      res.innerHTML = '✅ Ustvarjen: <b>' + data.firstName + ' ' + data.lastName + '</b> – uporabniško ime: <b>' + data.username + '</b>, geslo: <b>' + data.password + '</b>';
+      res.innerHTML = '✅ Ustvarjen: <b>' + data.firstName + ' ' + data.lastName + '</b> (' + data.grade + '. r) – uporabniško ime: <b>' + data.username + '</b>, geslo: <b>' + data.password + '</b>';
       loadStudents();
     });
 }
+
+/* ---- UREJANJE UČENCA (modal) ---- */
 function openStudentEdit(username) {
   var s = studentsList.find(x => x.username === username);
   if (!s) return;
@@ -875,22 +1099,36 @@ function openStudentEdit(username) {
   document.getElementById('editStudentError').textContent = '';
   document.getElementById('editStudentModal').classList.remove('hidden');
 }
-function closeStudentEdit() { document.getElementById('editStudentModal').classList.add('hidden'); editingStudentUsername = null; }
+function closeStudentEdit() {
+  document.getElementById('editStudentModal').classList.add('hidden');
+  editingStudentUsername = null;
+}
 function saveStudentEdit() {
   if (!editingStudentUsername) return;
-  var fn = document.getElementById('editFirstName').value.trim();
-  var ln = document.getElementById('editLastName').value.trim();
-  var un = document.getElementById('editUsername').value.trim();
-  var pw = document.getElementById('editPassword').value.trim();
-  var g = document.getElementById('editStudentGrade').value;
+  var firstName = document.getElementById('editFirstName').value.trim();
+  var lastName = document.getElementById('editLastName').value.trim();
+  var newUsername = document.getElementById('editUsername').value.trim();
+  var password = document.getElementById('editPassword').value.trim();
+  var grade = document.getElementById('editStudentGrade').value;
   var err = document.getElementById('editStudentError');
   err.textContent = '';
-  if (!fn || !ln || !un || !pw) { err.textContent = 'Izpolni vsa polja.'; return; }
-  fetch('/api/students/' + editingStudentUsername, { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()), body: JSON.stringify({ firstName: fn, lastName: ln, newUsername: un, password: pw, grade: g }) })
+  if (!firstName || !lastName) { err.textContent = 'Vnesi ime in priimek.'; return; }
+  if (!newUsername) { err.textContent = 'Vnesi uporabniško ime.'; return; }
+  if (!password) { err.textContent = 'Vnesi geslo.'; return; }
+
+  fetch('/api/students/' + editingStudentUsername, {
+    method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify({ firstName, lastName, newUsername, password, grade })
+  })
     .then(r => r.json())
-    .then(data => { if (data.error) { err.textContent = data.error; return; } closeStudentEdit(); loadStudents(); })
+    .then(data => {
+      if (data.error) { err.textContent = data.error; return; }
+      closeStudentEdit();
+      loadStudents();
+    })
     .catch(() => { err.textContent = 'Napaka pri shranjevanju.'; });
 }
+
 function deleteStudent(username) {
   if (!confirm('Res izbrišeš učenca ' + username + '?')) return;
   fetch('/api/students/' + username, { method: 'DELETE', headers: authHeaders() }).then(() => loadStudents());
@@ -902,56 +1140,16 @@ function exportPDF() {
   window.open('/api/students/pdf/' + filter + '?x-admin-user=' + encodeURIComponent(currentUser.username), '_blank');
 }
 
-/* ============================================================
-   UČITELJ: SKLOPI
-   ============================================================ */
-function loadTopics() {
-  return fetch('/api/topics', { headers: authHeaders() }).then(r => r.json()).then(list => { allTopics = list; return list; }).catch(() => { allTopics = []; return []; });
-}
-function onNewGradeChange() {
-  var g = parseInt(document.getElementById('newChapterGrade').value, 10);
-  var sel = document.getElementById('newChapterTopic');
-  var hint = document.getElementById('newTopicHint');
-  if (!allTopics.length) {
-    loadTopics().then(() => onNewGradeChange());
-    return;
-  }
-  var filtered = allTopics.filter(t => t.grade === g);
-  sel.innerHTML = '<option value="">— izberi temo —</option>';
-  filtered.forEach(t => { sel.innerHTML += '<option value="' + t.key + '">' + t.name + '</option>'; });
-  hint.textContent = '';
-  sel.onchange = function () {
-    var key = sel.value;
-    var t = allTopics.find(x => x.key === key);
-    hint.textContent = t ? t.description : '';
-  };
-}
-function onEditGradeChange() {
-  var g = parseInt(document.getElementById('editGrade').value, 10);
-  var sel = document.getElementById('editTopic');
-  var hint = document.getElementById('editTopicHint');
-  var filtered = allTopics.filter(t => t.grade === g);
-  var currentVal = sel.value;
-  sel.innerHTML = '<option value="">— izberi temo —</option>';
-  filtered.forEach(t => { sel.innerHTML += '<option value="' + t.key + '">' + t.name + '</option>'; });
-  if (filtered.find(t => t.key === currentVal)) sel.value = currentVal;
-  var t = allTopics.find(x => x.key === sel.value);
-  hint.textContent = t ? t.description : '';
-  sel.onchange = function () {
-    var tt = allTopics.find(x => x.key === sel.value);
-    hint.textContent = tt ? tt.description : '';
-  };
+function toggleTopicField() {
+  document.getElementById('newChapterTopic').classList.toggle('hidden', document.getElementById('newChapterType').value !== 'llm');
 }
 function toggleDeadlineField() {
   var c = document.getElementById('newChapterCategory').value;
   document.getElementById('newChapterDeadline').classList.toggle('hidden', c !== 'domaca');
 }
 function loadTeacherChapters() {
-  if (!allTopics.length) {
-    loadTopics().then(() => fetch('/api/chapters', { cache: 'no-store', headers: authHeaders() }).then(r => r.json()).then(list => { allChapters = list; renderTeacherChapterList(); }));
-  } else {
-    fetch('/api/chapters', { cache: 'no-store', headers: authHeaders() }).then(r => r.json()).then(list => { allChapters = list; renderTeacherChapterList(); });
-  }
+  fetch('/api/chapters', { cache: 'no-store' }).then(r => r.json()).then(list => { allChapters = list; renderTeacherChapterList(); })
+    .catch(() => { document.getElementById('teacherChapterList').innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
 }
 function renderTeacherChapterList() {
   var el = document.getElementById('teacherChapterList');
@@ -960,51 +1158,68 @@ function renderTeacherChapterList() {
   [6, 7, 8, 9].forEach(g => {
     var gch = allChapters.filter(c => c.grade === g);
     if (!gch.length) return;
-    html += '<details class="grade-group" open><summary>' + g + '. razred (' + gch.length + ')</summary><div class="grade-body">';
+    var opened = (g === currentGrade) ? ' open' : '';
+    html += '<details class="grade-group"' + opened + '>' +
+            '<summary>' + g + '. razred (' + gch.length + ')</summary>' +
+            '<div class="grade-body">';
     gch.forEach(ch => {
       var locked = ch.category === 'domaca' && ch.deadline && Date.now() > new Date(ch.deadline).getTime();
-      var t = allTopics.find(x => x.key === ch.topicKey);
-      var tname = t ? t.name : '(tema manjka)';
       var safeTitle = (ch.title || '').replace(/'/g, "\\'");
       html += '<div class="chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje ' : '') + '">' +
         '<div class="chapter-left" style="cursor:pointer;" onclick="openChapterSettings(\'' + ch.id + '\')">' +
         '<div class="chapter-title">' + ch.title +
-        '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' + (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span>' +
+        '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+        (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span>' +
         (locked ? '<span class="badge" style="background:#e74c3c;">ZAKLENJENO</span>' : '') +
-        '</div><div class="chapter-desc">Tema: ' + tname + '</div>';
+        '</div><div class="chapter-desc">' + (ch.desc || '') + '</div>';
       if (ch.deadline) html += '<div class="chapter-deadline">⏰ ' + new Date(ch.deadline).toLocaleString('sl-SI') + '</div>';
-      html += '</div><div class="chapter-actions">' +
-        '<button class="secondary" onclick="openChapterSettings(\'' + ch.id + '\')">⚙️</button>' +
-        '<button class="del" onclick="quickDeleteChapter(\'' + ch.id + '\', \'' + safeTitle + '\')">🗑️</button></div></div>';
+      html += '</div>' +
+        '<div class="chapter-actions">' +
+        '<button class="secondary" title="Nastavitve" onclick="openChapterSettings(\'' + ch.id + '\')">⚙️</button>' +
+        '<button class="del" title="Izbriši" onclick="quickDeleteChapter(\'' + ch.id + '\', \'' + safeTitle + '\')">🗑️</button>' +
+        '</div></div>';
     });
     html += '</div></details>';
   });
   el.innerHTML = html;
 }
+
 function quickDeleteChapter(id, title) {
-  if (!confirm('Izbrišem sklop "' + title + '"?')) return;
-  fetch('/api/chapters/' + id, { method: 'DELETE', headers: authHeaders() }).then(() => loadTeacherChapters());
+  if (!confirm('Res izbrišeš sklop "' + title + '"? Tega ni mogoče razveljaviti.')) return;
+  fetch('/api/chapters/' + id, { method: 'DELETE', headers: authHeaders() })
+    .then(r => r.json())
+    .then(function () { loadTeacherChapters(); })
+    .catch(function () { alert('Napaka pri brisanju.'); });
 }
+
 function addChapter() {
   var title = document.getElementById('newChapterTitle').value.trim();
-  var topicKey = document.getElementById('newChapterTopic').value;
+  var desc = document.getElementById('newChapterDesc').value.trim();
+  var type = document.getElementById('newChapterType').value;
   var grade = document.getElementById('newChapterGrade').value;
   var category = document.getElementById('newChapterCategory').value;
   var deadline = document.getElementById('newChapterDeadline').value;
+  var topic = document.getElementById('newChapterTopic').value.trim();
   var err = document.getElementById('chapterError');
   err.textContent = '';
   if (!title) { err.textContent = 'Vnesi naslov.'; return; }
-  if (!topicKey) { err.textContent = 'Izberi temo.'; return; }
+  if (type === 'llm' && !topic) { err.textContent = 'Za LLM vnesi temo.'; return; }
   if (category === 'domaca' && !deadline) { err.textContent = 'Za domačo določi rok.'; return; }
-  fetch('/api/chapters', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()), body: JSON.stringify({ title, topicKey, grade, category, deadline }) })
+  fetch('/api/chapters', {
+    method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify({ title, desc, type, grade, category, deadline, topic })
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) { err.textContent = data.error; return; }
       document.getElementById('newChapterTitle').value = '';
+      document.getElementById('newChapterDesc').value = '';
+      document.getElementById('newChapterTopic').value = '';
       document.getElementById('newChapterDeadline').value = '';
       loadTeacherChapters();
     });
 }
+
 var editingChapterId = null;
 function openChapterSettings(id) {
   var ch = allChapters.find(c => c.id === id);
@@ -1015,19 +1230,23 @@ function openChapterSettings(id) {
   document.getElementById('chapterSettingsView').classList.remove('hidden');
   document.getElementById('settingsSubtitle').textContent = ch.title;
   document.getElementById('editTitle').value = ch.title;
+  document.getElementById('editDesc').value = ch.desc || '';
+  document.getElementById('editType').value = ch.type;
   document.getElementById('editGrade').value = ch.grade;
-  onEditGradeChange();
-  document.getElementById('editTopic').value = ch.topicKey || '';
   document.getElementById('editCategory').value = ch.category;
   document.getElementById('editDeadline').value = ch.deadline ? toLocalDatetime(ch.deadline) : '';
+  document.getElementById('editTopic').value = ch.topic || '';
   document.getElementById('settingsError').textContent = '';
   toggleEditDeadline();
 }
 function toLocalDatetime(iso) {
-  var d = new Date(iso), pad = n => String(n).padStart(2, '0');
+  var d = new Date(iso);
+  var pad = n => String(n).padStart(2, '0');
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
-function toggleEditDeadline() { document.getElementById('editDeadline').classList.toggle('hidden', document.getElementById('editCategory').value !== 'domaca'); }
+function toggleEditDeadline() {
+  document.getElementById('editDeadline').classList.toggle('hidden', document.getElementById('editCategory').value !== 'domaca');
+}
 function backToTeacherChapters() {
   document.getElementById('chapterSettingsView').classList.add('hidden');
   document.getElementById('teacherHomeView').classList.remove('hidden');
@@ -1036,129 +1255,179 @@ function backToTeacherChapters() {
 function saveChapterSettings() {
   var payload = {
     title: document.getElementById('editTitle').value.trim(),
-    topicKey: document.getElementById('editTopic').value,
+    desc: document.getElementById('editDesc').value.trim(),
+    type: document.getElementById('editType').value,
     grade: document.getElementById('editGrade').value,
     category: document.getElementById('editCategory').value,
-    deadline: document.getElementById('editDeadline').value || null
+    deadline: document.getElementById('editDeadline').value || null,
+    topic: document.getElementById('editTopic').value.trim()
   };
   var err = document.getElementById('settingsError');
   err.textContent = '';
   if (!payload.title) { err.textContent = 'Naslov je obvezen.'; return; }
-  if (!payload.topicKey) { err.textContent = 'Izberi temo.'; return; }
   if (payload.category === 'domaca' && !payload.deadline) { err.textContent = 'Za domačo določi rok.'; return; }
-  fetch('/api/chapters/' + editingChapterId, { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()), body: JSON.stringify(payload) })
+  fetch('/api/chapters/' + editingChapterId, {
+    method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+    body: JSON.stringify(payload)
+  })
     .then(r => r.json())
     .then(data => { if (data.error) { err.textContent = data.error; return; } backToTeacherChapters(); });
 }
 function deleteChapterSettings() {
-  if (!confirm('Izbrišem sklop?')) return;
+  if (!confirm('Res izbrišeš ta sklop?')) return;
   fetch('/api/chapters/' + editingChapterId, { method: 'DELETE', headers: authHeaders() }).then(() => backToTeacherChapters());
 }
 
 /* ============================================================
-   ANALIZE
+   ANALIZE (učitelj)
    ============================================================ */
 function switchAnalysis(mode, ev) {
   Array.from(document.querySelectorAll('#teacherAnalysis [data-analysis-tab]')).forEach(t => t.classList.remove('active'));
-  var a = document.querySelector('#teacherAnalysis [data-analysis-tab="' + mode + '"]');
-  if (a) a.classList.add('active');
-  if (!studentsList.length) loadStudents().then(() => _runAnalysisMode(mode)); else _runAnalysisMode(mode);
+  var activeBtn = document.querySelector('#teacherAnalysis [data-analysis-tab="' + mode + '"]');
+  if (activeBtn) activeBtn.classList.add('active');
+
+  if (!studentsList.length) {
+    loadStudents().then(() => _runAnalysisMode(mode));
+  } else {
+    _runAnalysisMode(mode);
+  }
 }
 function _runAnalysisMode(mode) {
   if (mode === 'grade') renderTeacherByGrade();
   else if (mode === 'student') renderTeacherByStudent();
   else if (mode === 'chapter') renderTeacherByChapter();
 }
+
 function renderTeacherByGrade() {
   var c = document.getElementById('analysisContent');
   c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam ...</p>';
-  fetch('/api/teacher-analysis', { headers: authHeaders() }).then(r => r.json()).then(data => {
-    if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
-    var html = '<h3>Uspešnost po oddelkih</h3>', any = false;
-    [6, 7, 8, 9].forEach(g => {
-      var gd = data.byGrade[g];
-      if (!gd || !gd.total) { html += '<div class="detail-box"><b>' + g + '. razred</b> – še ni podatkov.</div>'; return; }
-      any = true;
-      var pct = Math.round(100 * gd.correct / gd.total);
-      html += '<div class="detail-box" style="margin-bottom:14px;"><h3>' + g + '. razred <span class="pct ' + pctClass(pct) + '">' + pct + '% (' + gd.correct + '/' + gd.total + ')</span></h3>';
-      html += '<div class="bar-container"><div class="bar-fill" style="width:' + pct + '%"></div></div><div style="margin-top:10px;">';
-      Object.keys(gd.chapters).forEach(chId => {
-        var chd = gd.chapters[chId];
-        var cp = chd.total ? Math.round(100 * chd.correct / chd.total) : 0;
-        html += '<div class="type-row"><span>' + chd.title + '</span><span class="pct ' + pctClass(cp) + '">' + cp + '%</span></div>';
-        html += '<div class="bar-container"><div class="bar-fill" style="width:' + cp + '%"></div></div>';
+  fetch('/api/teacher-analysis', { headers: authHeaders() })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
+      var html = '<h3>Uspešnost po oddelkih</h3>';
+      var any = false;
+      [6, 7, 8, 9].forEach(g => {
+        var gd = data.byGrade[g];
+        if (!gd || !gd.total) { html += '<div class="detail-box"><b>' + g + '. razred</b> – še ni podatkov.</div>'; return; }
+        any = true;
+        var pct = Math.round(100 * gd.correct / gd.total);
+        html += '<div class="detail-box" style="margin-bottom:14px;">';
+        html += '<h3>' + g + '. razred <span class="pct ' + pctClass(pct) + '">' + pct + '% (' + gd.correct + '/' + gd.total + ')</span></h3>';
+        html += '<div class="bar-container"><div class="bar-fill" style="width:' + pct + '%"></div></div>';
+        html += '<div style="margin-top:10px;">';
+        Object.keys(gd.chapters).forEach(chId => {
+          var chd = gd.chapters[chId];
+          var cp = chd.total ? Math.round(100 * chd.correct / chd.total) : 0;
+          html += '<div class="type-row"><span>' + chd.title + '</span><span class="pct ' + pctClass(cp) + '">' + cp + '%</span></div>';
+          html += '<div class="bar-container"><div class="bar-fill" style="width:' + cp + '%"></div></div>';
+        });
+        html += '</div></div>';
       });
-      html += '</div></div>';
-    });
-    if (!any) html += '<p class="empty-note">Še ni podatkov.</p>';
-    c.innerHTML = html;
-  });
+      if (!any) html += '<p class="empty-note">Še ni podatkov o reševanju.</p>';
+      c.innerHTML = html;
+    })
+    .catch(() => { c.innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
 }
+
 function renderTeacherByStudent() {
   var c = document.getElementById('analysisContent');
   c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam ...</p>';
-  fetch('/api/teacher-analysis', { headers: authHeaders() }).then(r => r.json()).then(data => {
-    if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
-    var html = '<h3>Uspešnost po učencih</h3><table><thead><tr><th>Učenec</th><th>Poskusi</th><th>Pravilnih</th><th>Uspešnost</th><th></th></tr></thead><tbody>';
-    var any = false;
-    Object.keys(data.byStudent).sort().forEach(u => {
-      var s = data.byStudent[u];
-      if (!s.total) return;
-      any = true;
-      var p = Math.round(100 * s.correct / s.total);
-      var name = studentsList.find(x => x.username === u);
-      html += '<tr><td>' + (name ? name.firstName + ' ' + name.lastName : u) + '</td><td>' + s.total + '</td><td>' + s.correct + '</td><td><span class="pct ' + pctClass(p) + '">' + p + '%</span></td>' +
-        '<td><button class="secondary small" onclick="openStudentDetail(\'' + u + '\')">Podrobno →</button></td></tr>';
-    });
-    html += '</tbody></table>';
-    if (!any) html = '<p class="empty-note">Še ni podatkov.</p>';
-    c.innerHTML = html;
-  });
+  fetch('/api/teacher-analysis', { headers: authHeaders() })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
+      var html = '<h3>Uspešnost po učencih</h3>';
+      html += '<p class="user-info" style="margin-bottom:12px;">Klikni »Podrobno« za celoten profil učenca.</p>';
+      html += '<table><thead><tr><th>Učenec</th><th>Poskusi</th><th>Pravilnih</th><th>Uspešnost</th><th></th></tr></thead><tbody>';
+      var any = false;
+      Object.keys(data.byStudent).sort().forEach(u => {
+        var s = data.byStudent[u];
+        if (!s.total) return;
+        any = true;
+        var p = Math.round(100 * s.correct / s.total);
+        var name = studentsList.find(x => x.username === u);
+        var display = name ? name.firstName + ' ' + name.lastName : u;
+        html += '<tr><td>' + display + '</td><td>' + s.total + '</td><td>' + s.correct +
+                '</td><td><span class="pct ' + pctClass(p) + '">' + p + '%</span></td>' +
+                '<td><button class="secondary small" onclick="openStudentDetail(\'' + u + '\')">Podrobno →</button></td></tr>';
+      });
+      html += '</tbody></table>';
+      if (!any) html = '<p class="empty-note">Še ni podatkov o reševanju.</p>';
+      c.innerHTML = html;
+    })
+    .catch(() => { c.innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
 }
+
 function renderTeacherByChapter() {
-  if (!allChapters.length) { loadTeacherChapters().then(() => _renderChapterListForAnalysis()); }
-  else _renderChapterListForAnalysis();
+  var c = document.getElementById('analysisContent');
+  if (!allChapters.length) {
+    c.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam sklope ...</p>';
+    fetch('/api/chapters', { cache: 'no-store' }).then(r => r.json()).then(list => {
+      allChapters = list;
+      _renderChapterListForAnalysis();
+    });
+  } else {
+    _renderChapterListForAnalysis();
+  }
 }
 function _renderChapterListForAnalysis() {
   var c = document.getElementById('analysisContent');
   if (!allChapters.length) { c.innerHTML = '<p class="empty-note">Ni sklopov.</p>'; return; }
-  var html = '<h3>Analiza sklopa</h3><p class="user-info" style="margin-bottom:12px;">Klikni na sklop.</p>';
+  var html = '<h3>Analiza sklopa</h3><p class="user-info" style="margin-bottom:12px;">Klikni na sklop za poglobljeno analizo.</p>';
   allChapters.forEach(ch => {
     html += '<div class="chapter ' + (ch.category === 'utrjevanje' ? 'utrjevanje' : '') + '" onclick="runChapterAnalysis(\'' + ch.id + '\')">' +
-      '<div class="chapter-left"><div class="chapter-title">' + ch.title + '<span class="badge badge-grade">' + ch.grade + '. r</span></div></div></div>';
+      '<div class="chapter-left"><div class="chapter-title">' + ch.title +
+      '<span class="badge badge-grade">' + ch.grade + '. r</span>' +
+      '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+      (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span></div>' +
+      '<div class="chapter-desc">' + (ch.desc || '') + '</div></div></div>';
   });
   c.innerHTML = html;
 }
+
 function runChapterAnalysis(chapterId) {
   var c = document.getElementById('analysisContent');
-  c.innerHTML = '<p class="loading"><span class="spinner"></span>Analiziram ...</p>';
-  fetch('/api/chapter-analysis/' + chapterId, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) })
+  c.innerHTML = '<p class="loading"><span class="spinner"></span>Generiram analizo ...</p>';
+  fetch('/api/chapter-analysis/' + chapterId, {
+    method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders())
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) { c.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
-      var html = '<div class="detail-box"><h3>' + data.title + '</h3>';
+      var html = '<div class="detail-box">';
+      html += '<h3>' + data.title + ' <span class="badge badge-grade">' + data.grade + '. r</span></h3>';
       html += '<div class="stats-grid">';
       html += '<div class="stat-card"><div class="num">' + data.totalAttempts + '</div><div class="lbl">Poskusov</div></div>';
       html += '<div class="stat-card"><div class="num">' + data.activeStudents + '</div><div class="lbl">Aktivnih</div></div>';
       html += '<div class="stat-card"><div class="num ' + pctClass(data.pct) + '">' + data.pct + '%</div><div class="lbl">Uspešnost</div></div>';
       html += '</div>';
+      if (data.text) html += '<h3>Pedagoška analiza</h3><div class="analysis-text">' + data.text + '</div>';
       if (data.topClassErrors && data.topClassErrors.length) {
         html += '<h3 style="margin-top:16px;">Najpogostejše napake</h3>';
-        data.topClassErrors.forEach(e => { html += '<div class="error-item"><b>' + e.question + '</b><br>Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>'; });
+        data.topClassErrors.forEach(e => {
+          html += '<div class="error-item"><b>' + normalizeLatex(e.question) + '</b><br>Pravilno: ' + normalizeLatex(e.correctAns) + ' • Ponovitve: ' + e.count + '</div>';
+        });
       }
       html += '<h3 style="margin-top:16px;">Po učencih</h3><table><thead><tr><th>Učenec</th><th>Poskusi</th><th>Pravilnih</th><th>Uspešnost</th></tr></thead><tbody>';
-      if (!data.perStudent.length) html += '<tr><td colspan="4" class="empty-note">Ni podatkov.</td></tr>';
-      else data.perStudent.forEach(p => {
-        var name = studentsList.find(x => x.username === p.username);
-        html += '<tr><td>' + (name ? name.firstName + ' ' + name.lastName : p.username) + '</td><td>' + p.total + '</td><td>' + p.correct + '</td><td><span class="pct ' + pctClass(p.pct) + '">' + p.pct + '%</span></td></tr>';
-      });
+      if (!data.perStudent.length) {
+        html += '<tr><td colspan="4" class="empty-note">Ni podatkov.</td></tr>';
+      } else {
+        data.perStudent.forEach(p => {
+          var name = studentsList.find(x => x.username === p.username);
+          html += '<tr><td>' + (name ? name.firstName + ' ' + name.lastName : p.username) + '</td><td>' + p.total +
+                  '</td><td>' + p.correct + '</td><td><span class="pct ' + pctClass(p.pct) + '">' + p.pct + '%</span></td></tr>';
+        });
+      }
       html += '</tbody></table></div>';
       c.innerHTML = html;
-    });
+      renderMath(c);
+    })
+    .catch(() => { c.innerHTML = '<p class="empty-note">Napaka pri analizi.</p>'; });
 }
 
 /* ============================================================
-   PODROBNA ANALIZA
+   PODROBNA ANALIZA UČENCA (profil)
    ============================================================ */
 function openStudentDetail(username) {
   currentDetailUsername = username;
@@ -1166,35 +1435,58 @@ function openStudentDetail(username) {
   document.getElementById('chapterSettingsView').classList.add('hidden');
   document.getElementById('studentDetailView').classList.remove('hidden');
   var content = document.getElementById('studentDetailContent');
-  content.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam ...</p>';
+  content.innerHTML = '<p class="loading"><span class="spinner"></span>Nalagam profil ...</p>';
+
   fetch('/api/student-detail/' + username, { headers: authHeaders() })
     .then(r => r.json())
     .then(data => {
       if (data.error) { content.innerHTML = '<p class="empty-note">' + data.error + '</p>'; return; }
-      document.getElementById('studentDetailTitle').textContent = '👤 ' + data.firstName + ' ' + data.lastName;
-      document.getElementById('studentDetailSubtitle').textContent = data.grade + '. razred  •  ' + data.overall.total + ' poskusov  •  uspešnost ' + data.overall.pct + '%';
-      var html = '<div class="stats-grid">';
-      html += '<div class="stat-card"><div class="num">' + data.overall.total + '</div><div class="lbl">Poskusov</div></div>';
+      document.getElementById('studentDetailTitle').textContent =
+        '👤 ' + data.firstName + ' ' + data.lastName;
+      document.getElementById('studentDetailSubtitle').textContent =
+        data.grade + '. razred  •  ' + data.overall.total + ' poskusov  •  skupna uspešnost ' + data.overall.pct + '%';
+
+      var html = '';
+      html += '<div class="stats-grid">';
+      html += '<div class="stat-card"><div class="num">' + data.overall.total + '</div><div class="lbl">Vseh poskusov</div></div>';
       html += '<div class="stat-card"><div class="num">' + data.overall.correct + '</div><div class="lbl">Pravilnih</div></div>';
       html += '<div class="stat-card"><div class="num ' + pctClass(data.overall.pct) + '">' + data.overall.pct + '%</div><div class="lbl">Uspešnost</div></div>';
+      html += '<div class="stat-card"><div class="num">' + data.chapters.length + '</div><div class="lbl">Sklopov</div></div>';
       html += '</div>';
-      if (!data.chapters.length) { html += '<p class="empty-note">Učenec še ni reševal.</p>'; content.innerHTML = html; return; }
+
+      if (!data.chapters.length) {
+        html += '<p class="empty-note">Učenec še ni reševal nobenega sklopa.</p>';
+        content.innerHTML = html;
+        return;
+      }
+
       ['domaca', 'utrjevanje'].forEach(cat => {
         var list = data.chapters.filter(c => c.category === cat);
         if (!list.length) return;
-        html += '<h3 style="margin-top:20px;">' + (cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje') + '</h3>';
+        html += '<h3 style="margin-top:20px;color:' + (cat === 'domaca' ? '#3498db' : '#27ae60') + ';">' +
+                (cat === 'domaca' ? '📘 Domače naloge' : '🏋️ Utrjevanje') + '</h3>';
         list.forEach(ch => {
-          html += '<div class="chapter" onclick="toggleChapterDetail(\'' + ch.chapterId + '\')"><div class="chapter-left">' +
-            '<div class="chapter-title">' + ch.title + '</div>' +
-            '<div class="chapter-desc">' + ch.total + ' poskusov • ' + ch.correct + ' pravilnih • ' + ch.correctFirst + ' v 1. poskusu</div></div>' +
-            '<div class="pct ' + pctClass(ch.pct) + '" style="font-size:20px;">' + ch.pct + '%</div></div>';
+          html += '<div class="chapter" onclick="toggleChapterDetail(\'' + ch.chapterId + '\')">' +
+            '<div class="chapter-left">' +
+            '<div class="chapter-title">' + ch.title +
+            '<span class="badge ' + (ch.category === 'domaca' ? 'badge-cat-domaca' : 'badge-cat-utrjevanje') + '">' +
+            (ch.category === 'domaca' ? 'Domača' : 'Utrjevanje') + '</span>' +
+            '</div>' +
+            '<div class="chapter-desc">' + ch.total + ' poskusov • ' + ch.correct + ' pravilnih • ' +
+            ch.correctFirst + ' pravilnih v 1. poskusu</div>' +
+            '</div>' +
+            '<div class="pct ' + pctClass(ch.pct) + '" style="font-size:20px;">' + ch.pct + '%</div>' +
+            '</div>';
           html += '<div id="chapterDetail_' + ch.chapterId + '" class="detail-box hidden" style="margin-bottom:12px;"></div>';
         });
       });
+
       content.innerHTML = html;
       content._detailData = data;
-    });
+    })
+    .catch(() => { content.innerHTML = '<p class="empty-note">Napaka pri nalaganju.</p>'; });
 }
+
 function toggleChapterDetail(chapterId) {
   var el = document.getElementById('chapterDetail_' + chapterId);
   if (!el) return;
@@ -1203,31 +1495,56 @@ function toggleChapterDetail(chapterId) {
   if (!data) return;
   var ch = data.chapters.find(c => c.chapterId === chapterId);
   if (!ch) return;
-  var html = '<div class="stats-grid">';
+
+  var html = '';
+  html += '<div class="stats-grid">';
   html += '<div class="stat-card"><div class="num">' + ch.total + '</div><div class="lbl">Poskusov</div></div>';
   html += '<div class="stat-card"><div class="num">' + ch.correct + '</div><div class="lbl">Pravilnih</div></div>';
   html += '<div class="stat-card"><div class="num">' + ch.correctFirst + '</div><div class="lbl">1. poskus</div></div>';
   html += '<div class="stat-card"><div class="num ' + pctClass(ch.pct) + '">' + ch.pct + '%</div><div class="lbl">Uspešnost</div></div>';
   html += '</div>';
-  if (ch.topErrors && ch.topErrors.length) {
-    html += '<h3>Najpogostejše napake</h3>';
-    ch.topErrors.forEach(e => { html += '<div class="error-item"><b>' + e.question + '</b><br>Napačno: ' + e.userAns + ' • Pravilno: ' + e.correctAns + ' • Ponovitve: ' + e.count + '</div>'; });
+
+  if (ch.byType && ch.byType.length) {
+    html += '<h3>Uspešnost po tipu naloge</h3>';
+    ch.byType.forEach(t => {
+      html += '<div class="type-row"><span>' + typeLabel(t.type) + ' (' + t.total + ')</span>' +
+              '<span class="type-pct pct ' + pctClass(t.pct) + '">' + t.pct + '%</span></div>';
+      html += '<div class="bar-container"><div class="bar-fill" style="width:' + t.pct + '%"></div></div>';
+    });
   }
+
+  if (ch.topErrors && ch.topErrors.length) {
+    html += '<h3 style="margin-top:14px;">Najpogostejše napake</h3>';
+    ch.topErrors.forEach(e => {
+      html += '<div class="error-item"><b>' + normalizeLatex(e.question) + '</b><br>' +
+        'Napačno: ' + e.userAns + ' • Pravilno: ' + normalizeLatex(e.correctAns) + ' • Ponovitve: ' + e.count + '</div>';
+    });
+  }
+
   if (ch.recentHistory && ch.recentHistory.length) {
     html += '<h3 style="margin-top:14px;">Zadnji poskusi</h3>';
     ch.recentHistory.forEach(h => {
-      html += '<div class="history-item ' + (h.ok ? 'ok' : 'fail') + '"><span class="history-q">' + h.question + '</span><span class="badge-' + (h.ok ? 'ok' : 'fail') + '">' + (h.ok ? '✓' : '✗') + '</span></div>';
+      html += '<div class="history-item ' + (h.ok ? 'ok' : 'fail') + '">' +
+        '<span class="history-q">' + normalizeLatex(h.question) + '</span>' +
+        '<span class="badge-' + (h.ok ? 'ok' : 'fail') + '">' + (h.ok ? '✓' : '✗') + '</span></div>';
     });
   }
+
   el.innerHTML = html;
   el.classList.remove('hidden');
+  renderMath(el);
 }
+
 function backToTeacherAnalysis() {
   document.getElementById('studentDetailView').classList.add('hidden');
   document.getElementById('teacherHomeView').classList.remove('hidden');
   switchTeacherTab('analysis');
 }
+
 function pctClass(p) { return p >= 75 ? 'good' : (p >= 50 ? 'mid' : 'bad'); }
+function typeLabel(t) {
+  return { add: 'Seštevanje', sub: 'Odštevanje', mul: 'Množenje', div: 'Deljenje', llm: 'LLM naloge' }[t] || t;
+}
 </script>
 </body>
 </html>
