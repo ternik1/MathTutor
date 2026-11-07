@@ -151,7 +151,7 @@ function validateSketch(question, sketch) {
 }
 
 /* ============================================================
-   UČNI NAČRT – RAZŠIRJEN S PRIMERI NALOG (brez RAG)
+   UČNI NAČRT PO RAZREDIH + PRIMERI
    ============================================================ */
 const CURRICULUM_BY_GRADE = {
   6: {
@@ -171,13 +171,11 @@ const CURRICULUM_BY_GRADE = {
     ],
     examples: [
       'Izračunaj: 3 456 + 2 789 − 1 234.',
-      'Katero število je zaokroženo na stotice enako 4 500?',
       'Pravokotnik ima stranici a = 8 cm in b = 5 cm. Izračunaj obseg in ploščino.',
       'Kocka ima rob a = 3 cm. Izračunaj površino in prostornino.',
       'Koliko je 2/5 od 30?',
       'Mama je kupila 2,5 kg jabolk in 1,75 kg hrušk. Koliko sadja je kupila skupaj?',
-      'Pretvori 3,5 km v metre.',
-      'V košari je 12 rdečih in 8 zelenih jabolk. Koliko je vseh jabolk?'
+      'Pretvori 3,5 km v metre.'
     ]
   },
   7: {
@@ -198,13 +196,11 @@ const CURRICULUM_BY_GRADE = {
     examples: [
       'Izračunaj največji skupni delitelj števil 24 in 36.',
       'Izračunaj: 2/3 + 1/4.',
-      'Izračunaj: 3/5 · 10/9.',
       'Reši enačbo: x + 12 = 25.',
       'Trikotnik ima stranice a = 5 cm, b = 6 cm, c = 7 cm. Izračunaj obseg.',
       'Trikotnik ima osnovnico a = 8 cm in višino v = 4 cm. Izračunaj ploščino.',
       'Koliko je 15 % od 200?',
-      'Paralelogram ima osnovnico a = 6 cm in višino v = 4 cm. Izračunaj ploščino.',
-      'V razredu je 25 učencev. Povprečna ocena pri matematiki je 3,8. Koliko je vsota vseh ocen?'
+      'Paralelogram ima osnovnico a = 6 cm in višino v = 4 cm. Izračunaj ploščino.'
     ]
   },
   8: {
@@ -232,8 +228,7 @@ const CURRICULUM_BY_GRADE = {
       'Krog ima polmer r = 5 cm. Izračunaj obseg in ploščino (π ≈ 3,14).',
       'Pravokotni trikotnik ima kateti a = 3 cm in b = 4 cm. Izračunaj hipotenuzo.',
       'Kocka ima rob a = 4 cm. Izračunaj površino in prostornino.',
-      'Kvader ima dimenzije a = 5 cm, b = 3 cm, c = 2 cm. Izračunaj prostornino.',
-      'Preveri, ali je 0,75 enako 3/4.'
+      'Kvader ima dimenzije a = 5 cm, b = 3 cm, c = 2 cm. Izračunaj prostornino.'
     ]
   },
   9: {
@@ -254,11 +249,8 @@ const CURRICULUM_BY_GRADE = {
       'Izračunaj: (x + 3)(x − 2).',
       'Razstavi izraz: x² − 9.',
       'Reši enačbo: 2(x − 3) = 4x + 8.',
-      'Reši enačbo: x/2 + 3 = 7.',
       'Linearna funkcija: y = 2x + 1. Izračunaj vrednost pri x = 3 in določi ničlo.',
-      'Dani sta premici y = 2x + 1 in y = −x + 4. Poišči presečišče.',
       'Prizma ima osnovno ploskev pravokotnik s stranicama 4 cm in 3 cm, višina prizme je 5 cm. Izračunaj prostornino.',
-      'Piramida ima kvadratno osnovno ploskev s stranico 4 cm in višino 6 cm. Izračunaj prostornino.',
       'Valj ima polmer r = 3 cm in višino v = 5 cm. Izračunaj prostornino (π ≈ 3,14).',
       'Krogla ima polmer r = 4 cm. Izračunaj površino in prostornino (π ≈ 3,14).',
       'V škatli je 5 rdečih in 7 modrih kroglic. Kolikšna je verjetnost, da potegnemo rdečo?'
@@ -699,7 +691,7 @@ app.post('/api/start-session', (req, res) => {
 });
 
 /* ============================================================
-   API: GENERIRANJE (brez RAG, a z učnim načrtom + primeri)
+   API: GENERIRANJE (brez RAG, z učnim načrtom + primeri)
    ============================================================ */
 app.post('/api/generate-task', async (req, res) => {
   const { username, chapterId, isRetry } = req.body || {};
