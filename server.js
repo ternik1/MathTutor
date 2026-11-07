@@ -80,45 +80,9 @@ function extractNumbers(text) {
   }
   return nums;
 }
-function extractOps(text) {
-  if (!text) return '';
-  const ops = [];
-  if (/\+/.test(text)) ops.push('+');
-  if (/-|−/.test(text)) ops.push('-');
-  if (/\\cdot|·|\*|\\times/.test(text)) ops.push('*');
-  if (/\/|:|\\div/.test(text)) ops.push('/');
-  if (/\\sqrt/.test(text)) ops.push('sqrt');
-  if (/\^/.test(text)) ops.push('^');
-  return ops.sort().join('');
-}
-function numbersOverlap(a, b) {
-  if (!a.length || !b.length) return false;
-  const setA = new Set(a.map(x => Math.abs(x).toFixed(4)));
-  const setB = new Set(b.map(x => Math.abs(x).toFixed(4)));
-  let common = 0;
-  setA.forEach(x => { if (setB.has(x)) common++; });
-  const minSize = Math.min(setA.size, setB.size);
-  return minSize > 0 && common / minSize >= 0.75;
-}
-function isTooSimilar(newTask, recentTasks) {
-  if (!newTask || !newTask.question) return false;
-  const newNums = extractNumbers(newTask.question);
-  const newOps = extractOps(newTask.question);
-  for (const t of recentTasks) {
-    if (!t || !t.question) continue;
-    const oldNums = extractNumbers(t.question);
-    const oldOps = extractOps(t.question);
-    if (newOps === oldOps && numbersOverlap(newNums, oldNums)) return true;
-  }
-  return false;
-}
 
-/* ============================================================
-   PREVERJANJE PODVAJANJA MED SKICO IN BESEDILOM
-   ============================================================ */
 function textHasNumbers(text) {
   if (!text) return false;
-  // Odstrani morebitno zaporedno številko vprašanja "1."
   const cleaned = String(text).replace(/^\s*\d+[.)]\s*/, '');
   return /-?\d+(?:[.,]\d+)?/.test(cleaned);
 }
@@ -127,7 +91,7 @@ function sketchHasNumbers(sketch) {
   if (!sketch || typeof sketch !== 'object') return false;
   const data = sketch.data || {};
   for (const key of Object.keys(data)) {
-    if (key === 'unit') continue; // enota (cm, °) ni podatek
+    if (key === 'unit') continue;
     const v = data[key];
     if (typeof v === 'number' && !isNaN(v)) return true;
     if (typeof v === 'string' && /-?\d+(?:[.,]\d+)?/.test(v)) return true;
@@ -136,22 +100,251 @@ function sketchHasNumbers(sketch) {
 }
 
 function hasSketchData(sketch) {
-  if (!sketch || !sketch.type) return false;
-  return true;
+  return !!(sketch && sketch.type);
 }
 
-/**
- * Preveri, ali se podatki med skico in besedilom podvajajo.
- * Vrne true, če je OK; false, če se podvaja.
- */
-function sketchTextConsistent(question, sketch) {
-  const hasText = textHasNumbers(question);
-  const hasSketch = hasSketchData(sketch);
-  const sketchNums = hasSketch && sketchHasNumbers(sketch);
+/* ============================================================
+   PREVERJANJE SKICE (strogo)
+   ============================================================ */
+function validateSketch(question, sketch) {
+  if (!sketch || !sketch.type) return { ok: true };
 
-  if (!hasSketch) return true;
-  if (!hasText) return true;
-  if (sketchNums && hasText) return false;
+  const data = sketch.data || {};
+  const hasNumbersInSketch = sketchHasNumbers(sketch);
+  const hasNumbersInText = textHasNumbers(question);
+
+  // Pravilo 1: skica in besedilo ne smeta imeti številk hkrati
+  if (hasNumbersInSketch && hasNumbersInText) {
+    return { ok: false, reason: 'Skica in besedilo hkrati vsebujeta številke (podvajanje podatkov).' };
+  }
+
+  // Pravilo 2: enakostranični trikotnik mora biti v besedilu označen
+  if (sketch.type === 'triangle') {
+    const isEquilateral = /enakostran|enakostrani/i.test(question);
+    const a = parseFloat(data.a), b = parseFloat(data.b), c = parseFloat(data.c);
+    if (!isNaN(a) && !isNaN(b) && !isNaN(c) && a === b && b === c && !isEquilateral) {
+      return { ok: false, reason: 'Skica prikazuje trikotnik z enakimi stranicami, vendar besedilo ne navaja "enakostranični trikotnik".' };
+    }
+  }
+
+  return { ok: true };
+}
+
+/* ============================================================
+   PREVERJANJE SKLADNOSTI S STOPNJO (steps_required)
+   ============================================================ */
+function allowedStepsForLevel(level) {
+  // stopnja 1: 1 korak, stopnja 2: 2 koraka, stopnja 3: 2-3 koraki
+  if (level <= 1) return 1;
+  if (level === 2) return 2;
+  return 3;
+}
+
+function validateStepsRequired(level, stepsRequired) {
+  if (!Array.isArray(stepsRequired) || stepsRequired.length === 0) return { ok: true };
+  const allowed = allowedStepsForLevel(level);
+  if (stepsRequired.length > allowed) {
+    return { ok: false, reason: `Naloga zahteva ${stepsRequired.length} korakov, stopnja ${level} dovoljuje največ ${allowed}.` };
+  }
+  return { ok: true };
+}
+
+/* ============================================================
+   PREPOVEDANE BESEDE PO STOPNJI (skladnost z učnim načrtom)
+   ============================================================ */
+function validateTopicForLevel(question, level, topicRules) {
+  if (!topicRules) return { ok: true };
+  const rules = topicRules[level] || topicRules[3];
+  if (!rules) return { ok: true };
+  const q = String(question).toLowerCase();
+  if (rules.forbidden) {
+    for (const bad of rules.forbidden) {
+      if (q.includes(bad.toLowerCase())) {
+        return { ok: false, reason: `Naloga vsebuje prepovedan koncept za stopnjo ${level}: "${bad}".` };
+      }
+    }
+  }
+  return { ok: true };
+}
+
+/* ============================================================
+   PROFIL UČENCA ZA PROMPT
+   ============================================================ */
+function buildStudentProfile(username, chapterId) {
+  const stats = DATA.stats[username] && DATA.stats[username][chapterId];
+  if (!stats || !stats.total) {
+    return 'Ta učenec je prvič v tem poglavju, brez preteklih podatkov.';
+  }
+  const pct = Math.round(100 * stats.correct / stats.total);
+  const errorTypes = Object.keys(stats.byType || {})
+    .map(t => {
+      const bt = stats.byType[t];
+      const wrong = bt.total - bt.correct;
+      return wrong > 0 ? `${t}: ${wrong}/${bt.total} napačnih` : null;
+    })
+    .filter(Boolean)
+    .join(', ');
+  const lastErrors = (stats.errors || []).slice(-3).map(e => e.question).join('; ');
+  return `Učenec je v tem poglavju rešil ${stats.total} nalog, uspešnost ${pct}%. 
+Razčlenitev napak po tipih: ${errorTypes || 'ni posebnih napak'}.
+Zadnje 3 napake: ${lastErrors || 'brez'}.`;
+}
+
+/* ============================================================
+   PRAVILA PO TEMI IN STOPNJI (skladnost z iUčbenikom)
+   ============================================================ */
+function getTopicRules(topicText) {
+  const t = (topicText || '').toLowerCase();
+
+  // Obseg in ploščina trikotnika – BREZ Pitagorovega izreka
+  if ((t.includes('trikot') || t.includes('obseg') || t.includes('ploščin')) &&
+      !t.includes('pitagor')) {
+    return {
+      1: {
+        forbidden: ['pitagor', 'hipotenuz', '√', 'koren', 'višina iz stranic', 'enakokraki brez višine'],
+        note: 'Samo neposredni izračun obsega s tremi znanimi stranicami ali ploščine z znano osnovnico in višino.'
+      },
+      2: {
+        forbidden: ['pitagor', 'hipotenuz', '√', 'koren'],
+        note: 'Besedilne naloge z obsegom in ploščino, enakokraki trikotnik z znano višino. Brez Pitagorovega izreka.'
+      },
+      3: {
+        forbidden: ['pitagor', 'hipotenuz'],
+        note: 'Kombinirane naloge iz obsega in ploščine. Brez Pitagorovega izreka in brez iskanja višine iz stranic.'
+      }
+    };
+  }
+
+  // Pitagorov izrek
+  if (t.includes('pitagor')) {
+    return {
+      1: { forbidden: [], note: 'Prepoznaj pravokotni trikotnik, označi kateti in hipotenuzo.' },
+      2: { forbidden: [], note: 'Pitagorov izrek s pitagorejskimi trojicami (3,4,5 / 6,8,10).' },
+      3: { forbidden: [], note: 'Pitagorov izrek v besedilni nalogi (lestev, diagonala).' }
+    };
+  }
+
+  // Cela števila
+  if (t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak')) {
+    return {
+      1: { forbidden: ['ulom', 'decimal', 'koren', 'potenc'], note: 'Seštevanje in odštevanje enomestnih celih števil.' },
+      2: { forbidden: ['ulom', 'decimal', 'koren', 'potenc'], note: 'Množenje ali deljenje enomestnih celih števil.' },
+      3: { forbidden: ['ulom', 'decimal'], note: 'Kombinacija dveh operacij z dvomestnimi celimi števili.' }
+    };
+  }
+
+  // Ulomki
+  if (t.includes('ulom')) {
+    return {
+      1: { forbidden: ['decimal', 'negativ'], note: 'Ulomki z enakim imenovalcem, seštevanje.' },
+      2: { forbidden: ['decimal'], note: 'Ulomki z enakim imenovalcem, odštevanje in krajšanje.' },
+      3: { forbidden: [], note: 'Ulomki z različnimi imenovalci, množenje ali deljenje.' }
+    };
+  }
+
+  // Decimalna števila
+  if (t.includes('decimal')) {
+    return {
+      1: { forbidden: ['ulom'], note: 'Decimalna števila z eno decimalko, seštevanje.' },
+      2: { forbidden: ['ulom'], note: 'Decimalna števila z eno decimalko, odštevanje.' },
+      3: { forbidden: ['ulom'], note: 'Decimalna števila z dvema decimalkama, množenje ali deljenje z 10, 100.' }
+    };
+  }
+
+  return null;
+}
+
+/* ============================================================
+   STROGA PRAVILA GLEDE NA RAZRED IN TEMO
+   ============================================================ */
+function strictLevelRules(grade, topic) {
+  const t = (topic || '').toLowerCase();
+  const isCelaStevila = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
+  const isUlomki = t.includes('ulom');
+  const isDecimalna = t.includes('decimal');
+  const isPotence = t.includes('potenc') || t.includes('koren');
+  const isOdstotki = t.includes('odstot');
+  const isEnacbe = t.includes('enačb') || t.includes('enacb');
+  const isPitagora = t.includes('pitagor');
+  const isGeometrija = t.includes('geometr') || isPitagora || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat') || t.includes('obseg') || t.includes('ploščin') || t.includes('prostornin');
+
+  if (isPitagora) {
+    return {
+      1: 'prepoznaj pravokotni trikotnik in označi kateti ter hipotenuzo.',
+      2: 'Pitagorov izrek z enostavnimi pitagorejskimi trojicami (3,4,5 / 6,8,10).',
+      3: 'Pitagorov izrek v besedilni nalogi (npr. lestev, diagonala).'
+    };
+  }
+  if (isCelaStevila) {
+    return {
+      1: 'seštevanje in odštevanje ENOMESTNIH celih števil (npr. 3 + (−4), −2 + 5).',
+      2: 'množenje ali deljenje enomestnih celih števil.',
+      3: 'kombinacija dveh operacij z dvomestnimi celimi števili.'
+    };
+  }
+  if (isUlomki) {
+    return {
+      1: 'ulomki z ENAKIM imenovalcem, seštevanje.',
+      2: 'ulomki z ENAKIM imenovalcem, odštevanje in krajšanje.',
+      3: 'ulomki z RAZLIČNIMI imenovalci.'
+    };
+  }
+  if (isDecimalna) {
+    return {
+      1: 'decimalna števila z ENO decimalko, seštevanje.',
+      2: 'decimalna števila z ENO decimalko, odštevanje.',
+      3: 'decimalna števila z DVEMA decimalkama, množenje ali deljenje z 10, 100.'
+    };
+  }
+  if (isPotence) {
+    return {
+      1: 'kvadrat ENOMESTNEGA števila.',
+      2: 'kvadrat DVOMESTNEGA števila ali kub enomestnega.',
+      3: 'kvadratni koren popolnega kvadrata ali potenca z negativnim eksponentom.'
+    };
+  }
+  if (isOdstotki) {
+    return {
+      1: '10 % od okroglega števila.',
+      2: '1 % in 10 % od števila.',
+      3: 'poljuben odstotek od števila ali odstotek, če poznamo delež.'
+    };
+  }
+  if (isEnacbe) {
+    return {
+      1: 'enačba z ENO operacijo (npr. x + 3 = 7).',
+      2: 'enačba z DVEMA operacijama (npr. 2x = 8) ali neznanka na obeh straneh.',
+      3: 'enačba z oklepaji ali besedilna naloga, ki vodi v enačbo.'
+    };
+  }
+  if (isGeometrija) {
+    return {
+      1: 'obseg pravokotnika ali ploščina kvadrata z neposredno znanimi podatki.',
+      2: 'obseg/ploščina trikotnika s tremi znanimi stranicami ali znano osnovnico in višino.',
+      3: 'kombinirana geometrijska naloga BREZ Pitagorovega izreka.'
+    };
+  }
+
+  return {
+    1: 'enomestna števila, ena operacija.',
+    2: 'dvomestna števila, ena operacija.',
+    3: 'dvomestna števila, dve operaciji.'
+  };
+}
+
+function taskTypeAllowed(question, topic) {
+  const t = (topic || '').toLowerCase();
+  const q = (question || '').toLowerCase();
+  const allowsFractions = t.includes('ulom');
+  const allowsDecimal = t.includes('decimal') || t.includes('odstot') || t.includes('koren') || t.includes('potenc');
+  const isCelaStevila = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
+
+  if (!allowsFractions && /\\frac/.test(q)) return false;
+  if (!allowsDecimal && /[0-9],[0-9]|[0-9]\.[0-9]/.test(q)) return false;
+  if (!t.includes('potenc') && !t.includes('koren') && /\^/.test(q)) {
+    if (!allowsDecimal) return false;
+  }
+  if (isCelaStevila && /\\frac/.test(q)) return false;
   return true;
 }
 
@@ -174,14 +367,12 @@ function generatePassword() {
 }
 
 /* ============================================================
-   ZDRUŽI TEMA SKLOPA (samo za interno prepoznavo)
+   ZDRUŽI TEMA SKLOPA
    ============================================================ */
 function chapterTopicText(ch) {
   const parts = [];
   if (ch.title) parts.push(ch.title);
-  // Interna navodila za Groq (niso vidna učencem)
   if (ch.llmPrompt) parts.push(ch.llmPrompt);
-  // Za nazaj kompatibilnost s starimi sklopi, kjer je bil instructions uporabljen kot prompt
   else if (ch.instructions) parts.push(ch.instructions);
   return parts.join(' ').trim();
 }
@@ -197,7 +388,7 @@ const groqClient = new OpenAI({
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 /* ============================================================
-   SHRAMBA – MongoDB Atlas
+   SHRAMBA
    ============================================================ */
 const MONGODB_URI = process.env.MONGODB_URI;
 let mongoClient = null;
@@ -275,118 +466,6 @@ async function saveData() {
   } catch (err) {
     console.warn('Napaka pri shranjevanju v MongoDB:', err.message);
   }
-}
-
-/* ============================================================
-   STROGA PRAVILA GLEDE NA RAZRED IN TEMO
-   ============================================================ */
-function strictLevelRules(grade, topic) {
-  const t = (topic || '').toLowerCase();
-  const isCelaStevila = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
-  const isUlomki = t.includes('ulom');
-  const isDecimalna = t.includes('decimal');
-  const isPotence = t.includes('potenc') || t.includes('koren');
-  const isOdstotki = t.includes('odstot');
-  const isEnacbe = t.includes('enačb') || t.includes('enacb');
-  const isPitagora = t.includes('pitagor');
-  const isGeometrija = t.includes('geometr') || isPitagora || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat') || t.includes('obseg') || t.includes('ploščin') || t.includes('prostornin');
-
-  if (isPitagora) {
-    return {
-      1: 'prepoznaj pravokotni trikotnik in označi kateti ter hipotenuzo.',
-      2: 'Pitagorov izrek z enostavnimi pitagorejskimi trojicami (3,4,5 / 6,8,10).',
-      3: 'izračunaj manjkajočo stranico pravokotnega trikotnika.',
-      4: 'Pitagorov izrek v besedilni nalogi (npr. lestev, diagonala).',
-      5: 'kombinirana naloga: Pitagorov izrek + ploščina/obseg.'
-    };
-  }
-  if (isCelaStevila) {
-    return {
-      1: 'seštevanje in odštevanje ENOMESTNIH celih števil (npr. 3 + (−4), −2 + 5).',
-      2: 'seštevanje in odštevanje DVOMESTNIH celih števil.',
-      3: 'množenje ali deljenje enomestnih celih števil.',
-      4: 'kombinacija dveh operacij z dvomestnimi celimi števili.',
-      5: 'besedilna naloga z več koraki, cela števila do 100.'
-    };
-  }
-  if (isUlomki) {
-    return {
-      1: 'ulomki z ENAKIM imenovalcem, seštevanje.',
-      2: 'ulomki z ENAKIM imenovalcem, odštevanje in krajšanje.',
-      3: 'ulomki z RAZLIČNIMI imenovalci.',
-      4: 'množenje ali deljenje ulomkov.',
-      5: 'besedilna naloga z ulomki.'
-    };
-  }
-  if (isDecimalna) {
-    return {
-      1: 'decimalna števila z ENO decimalko, seštevanje.',
-      2: 'decimalna števila z ENO decimalko, odštevanje.',
-      3: 'decimalna števila z DVEMA decimalkama.',
-      4: 'množenje ali deljenje decimalnih števil z 10, 100.',
-      5: 'besedilna naloga z decimalnimi števili.'
-    };
-  }
-  if (isPotence) {
-    return {
-      1: 'kvadrat ENOMESTNEGA števila.',
-      2: 'kvadrat DVOMESTNEGA števila ali kub enomestnega.',
-      3: 'kvadratni koren popolnega kvadrata.',
-      4: 'potence z negativnim eksponentom ali kombinacija.',
-      5: 'besedilna naloga s potencami ali koreni.'
-    };
-  }
-  if (isOdstotki) {
-    return {
-      1: '10 % od okroglega števila.',
-      2: '1 % in 10 % od števila.',
-      3: 'poljuben odstotek od števila.',
-      4: 'odstotek, če poznamo delež.',
-      5: 'besedilna naloga z odstotki.'
-    };
-  }
-  if (isEnacbe) {
-    return {
-      1: 'enačba z ENO operacijo (npr. x + 3 = 7).',
-      2: 'enačba z DVEMA operacijama (npr. 2x = 8).',
-      3: 'enačba z neznanko na obeh straneh.',
-      4: 'enačba z oklepaji.',
-      5: 'besedilna naloga, ki vodi v enačbo.'
-    };
-  }
-  if (isGeometrija) {
-    return {
-      1: 'osnovni pojem (prepoznaj lik, izmeri dolžino).',
-      2: 'obseg pravokotnika ali ploščina kvadrata.',
-      3: 'obseg/ploščina trikotnika ali paralelograma BREZ Pitagorovega izreka.',
-      4: 'zahtevnejši lik, a brez Pitagorovega izreka.',
-      5: 'kombinirana geometrijska naloga, brez Pitagorovega izreka.'
-    };
-  }
-
-  return {
-    1: 'enomestna števila, ena operacija.',
-    2: 'dvomestna števila brez prehoda čez desetico.',
-    3: 'dvomestna števila s prehodom čez desetico.',
-    4: 'trimestna števila, dve operaciji.',
-    5: 'besedilna naloga.'
-  };
-}
-
-function taskTypeAllowed(question, topic) {
-  const t = (topic || '').toLowerCase();
-  const q = (question || '').toLowerCase();
-  const allowsFractions = t.includes('ulom');
-  const allowsDecimal = t.includes('decimal') || t.includes('odstot') || t.includes('koren') || t.includes('potenc');
-  const isCelaStevila = t.includes('celo') || t.includes('cela') || t.includes('negativ') || t.includes('predznak');
-
-  if (!allowsFractions && /\\frac/.test(q)) return false;
-  if (!allowsDecimal && /[0-9],[0-9]|[0-9]\.[0-9]/.test(q)) return false;
-  if (!t.includes('potenc') && !t.includes('koren') && /\^/.test(q)) {
-    if (!allowsDecimal) return false;
-  }
-  if (isCelaStevila && /\\frac/.test(q)) return false;
-  return true;
 }
 
 /* ============================================================
@@ -476,7 +555,6 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
-
 function isAdminRequest(req) {
   const adminUsername = req.headers['x-admin-user'] || (req.body && req.body._admin) || req.query['x-admin-user'];
   return !!(adminUsername && DATA.users[adminUsername] && DATA.users[adminUsername].role === 'admin');
@@ -509,14 +587,11 @@ app.put('/api/students/:username', requireAdmin, async (req, res) => {
   if (!DATA.users[oldUsername] || DATA.users[oldUsername].role !== 'student') {
     return res.status(404).json({ error: 'Učenec ne obstaja.' });
   }
-
   const { firstName, lastName, grade, password, newUsername } = req.body || {};
-
   if (grade !== undefined && grade !== null && grade !== '') {
     const g = parseInt(grade, 10);
     if (![6, 7, 8, 9].includes(g)) return res.status(400).json({ error: 'Razred 6–9.' });
   }
-
   let finalUsername = oldUsername;
   if (newUsername && newUsername.trim() !== '' && newUsername.trim() !== oldUsername) {
     const candidate = newUsername.trim();
@@ -528,7 +603,6 @@ app.put('/api/students/:username', requireAdmin, async (req, res) => {
     }
     finalUsername = candidate;
   }
-
   const updated = Object.assign({}, DATA.users[oldUsername]);
   if (firstName !== undefined && firstName !== '') updated.firstName = firstName;
   if (lastName !== undefined && lastName !== '') updated.lastName = lastName;
@@ -538,20 +612,9 @@ app.put('/api/students/:username', requireAdmin, async (req, res) => {
   if (finalUsername !== oldUsername) {
     DATA.users[finalUsername] = updated;
     delete DATA.users[oldUsername];
-
-    if (DATA.stats[oldUsername]) {
-      DATA.stats[finalUsername] = DATA.stats[oldUsername];
-      delete DATA.stats[oldUsername];
-    }
-    if (DATA.sessions[oldUsername]) {
-      DATA.sessions[finalUsername] = DATA.sessions[oldUsername];
-      delete DATA.sessions[oldUsername];
-    }
-    if (DATA.recentTasks[oldUsername]) {
-      DATA.recentTasks[finalUsername] = DATA.recentTasks[oldUsername];
-      delete DATA.recentTasks[oldUsername];
-    }
-
+    if (DATA.stats[oldUsername]) { DATA.stats[finalUsername] = DATA.stats[oldUsername]; delete DATA.stats[oldUsername]; }
+    if (DATA.sessions[oldUsername]) { DATA.sessions[finalUsername] = DATA.sessions[oldUsername]; delete DATA.sessions[oldUsername]; }
+    if (DATA.recentTasks[oldUsername]) { DATA.recentTasks[finalUsername] = DATA.recentTasks[oldUsername]; delete DATA.recentTasks[oldUsername]; }
     if (db) {
       await db.collection('users').deleteOne({ _id: oldUsername });
       await db.collection('stats').deleteOne({ _id: oldUsername });
@@ -561,7 +624,6 @@ app.put('/api/students/:username', requireAdmin, async (req, res) => {
   } else {
     DATA.users[oldUsername] = updated;
   }
-
   await saveData();
   res.json({ ok: true, username: finalUsername, user: DATA.users[finalUsername] });
 });
@@ -639,11 +701,8 @@ app.get('/api/students/pdf/:grade', requireAdmin, (req, res) => {
 app.get('/api/chapters', (req, res) => {
   const grade = req.query.grade ? parseInt(req.query.grade, 10) : null;
   const admin = isAdminRequest(req);
-
   let list = DATA.chapters;
   if (grade) list = list.filter(c => c.grade === grade);
-
-  // Za učence odstrani skrita polja (llmPrompt)
   if (!admin) {
     list = list.map(c => {
       const copy = Object.assign({}, c);
@@ -670,8 +729,8 @@ app.post('/api/chapters', requireAdmin, async (req, res) => {
   const ch = {
     id: 'ch_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
     title,
-    instructions: instructions || '',   // VIDNO učencem (kratek opis)
-    llmPrompt: llmPrompt || '',          // SKRITO – samo za Groq
+    instructions: instructions || '',
+    llmPrompt: llmPrompt || '',
     type,
     grade: parseInt(grade, 10),
     category,
@@ -705,6 +764,28 @@ app.delete('/api/chapters/:id', requireAdmin, async (req, res) => {
 });
 
 /* ============================================================
+   POMOŽNA: NOVA SEJA
+   ============================================================ */
+function createEmptySession() {
+  return {
+    level: 1,
+    progression: { level: 1, correctInLevel: 0 },
+    correct: 0,
+    attempts: 0,
+    currentTask: null,
+    finished: false,
+    awaitingNext: false,
+    lastFailedTask: null,
+    history: [],
+    updatedAt: Date.now()
+  };
+}
+
+function requiredInLevel(level) {
+  return level === 3 ? 1 : 2;
+}
+
+/* ============================================================
    API: SEJA
    ============================================================ */
 app.post('/api/start-session', (req, res) => {
@@ -720,24 +801,24 @@ app.post('/api/start-session', (req, res) => {
   }
   if (reset) {
     DATA.sessions[username] = DATA.sessions[username] || {};
-    DATA.sessions[username][chapterId] = {
-      level: 1, correct: 0, attempts: 0, currentTask: null,
-      finished: false, awaitingNext: false, history: [], updatedAt: Date.now()
-    };
+    DATA.sessions[username][chapterId] = createEmptySession();
     saveData();
   }
   if (!DATA.sessions[username]) DATA.sessions[username] = {};
   if (!DATA.sessions[username][chapterId]) {
-    DATA.sessions[username][chapterId] = {
-      level: 1, correct: 0, attempts: 0,
-      currentTask: null, finished: false,
-      awaitingNext: false, history: [], updatedAt: Date.now()
-    };
+    DATA.sessions[username][chapterId] = createEmptySession();
   }
   const sess = DATA.sessions[username][chapterId];
   res.json({
-    ok: true, level: sess.level, correct: sess.correct, attempts: sess.attempts,
-    finished: sess.finished, target: 5, grade: ch.grade,
+    ok: true,
+    level: sess.progression.level,
+    correct: sess.correct,
+    attempts: sess.attempts,
+    finished: sess.finished,
+    target: 5,
+    grade: ch.grade,
+    progression: sess.progression,
+    requiredInLevel: requiredInLevel(sess.progression.level),
     hasCurrentTask: !!sess.currentTask && !sess.finished,
     currentTask: sess.currentTask && !sess.finished ? {
       question: sess.currentTask.question,
@@ -767,18 +848,14 @@ app.post('/api/generate-task', async (req, res) => {
 
   if (!DATA.sessions[username]) DATA.sessions[username] = {};
   if (!DATA.sessions[username][chapterId]) {
-    DATA.sessions[username][chapterId] = {
-      level: 1, correct: 0, attempts: 0,
-      currentTask: null, finished: false,
-      awaitingNext: false, history: [], updatedAt: Date.now()
-    };
+    DATA.sessions[username][chapterId] = createEmptySession();
   }
   const sess = DATA.sessions[username][chapterId];
   if (sess.finished) {
-    return res.json({ finished: true, correct: sess.correct, attempts: sess.attempts, level: sess.level });
+    return res.json({ finished: true, correct: sess.correct, attempts: sess.attempts, level: sess.progression.level });
   }
 
-  const level = sess.level;
+  const level = sess.progression.level;
   const grade = ch.grade;
   const topicText = chapterTopicText(ch);
   const topicLower = topicText.toLowerCase();
@@ -790,7 +867,7 @@ app.post('/api/generate-task', async (req, res) => {
 
   const strictRules = strictLevelRules(grade, topicText);
   const levelDesc = strictRules[level] || strictRules[3];
-  const seed = username + '_' + Date.now() + '_' + Math.random();
+  const topicRules = getTopicRules(topicText);
 
   if (!DATA.recentTasks[username]) DATA.recentTasks[username] = {};
   if (!DATA.recentTasks[username][chapterId]) DATA.recentTasks[username][chapterId] = [];
@@ -802,11 +879,19 @@ app.post('/api/generate-task', async (req, res) => {
     ? Array.from(new Set(recentNumbers.map(n => n.toFixed(2)))).join(', ')
     : '(še ni bilo nalog)';
 
+  // Prejšnja neuspešna naloga – ne sme se ponoviti
+  let lastFailedNotice = '';
+  if (sess.lastFailedTask) {
+    lastFailedNotice = `\n⚠️ PREJŠNJA NALOGA JE BILA NEUSPEŠNO GENERIRANA ALI ZAVRNJENA:\n"${sess.lastFailedTask}"\nNE PONAVLJAJ te naloge. Generiraj drugačno nalogo.`;
+  }
+
+  const studentProfile = buildStudentProfile(username, chapterId);
+
   let sketchInstruction = '';
   if (isGeometry) {
     sketchInstruction = `
-⚠️ SKICA:
-- V polje "sketch" vrni JSON objekt z opisom skice. Možni tipi:
+⚠️ SKICA (JSON objekt v polju "sketch"):
+- Možni tipi:
   * {"type":"right_triangle","data":{"a":8,"b":15,"unit":"cm"}}
   * {"type":"triangle","data":{"a":5,"b":6,"c":7,"unit":"cm"}}
   * {"type":"rectangle","data":{"a":5,"b":3,"unit":"cm"}}
@@ -815,11 +900,12 @@ app.post('/api/generate-task', async (req, res) => {
   * {"type":"angle","data":{"alpha":45,"beta":60,"unit":"°"}}
 - Če skica ni smiselna, vrni "sketch": null.
 
-⚠️⚠️ STROGO PRAVILO – BREZ PODVAJANJA:
-- Podatki so lahko SAMO na enem mestu: ali v besedilu ALI na skici.
-- Če so podatki (npr. dolžine stranic) prikazani na skici, jih besedilo naloge NE sme ponovno navajati. Besedilo naj vsebuje le vprašanje (npr. "Izračunaj obseg.").
-- Če so podatki v besedilu naloge, skica NE sme vsebovati nobenih številk ali oznak z merami. Skica naj prikaže le obliko brez mer (npr. trikotnik brez oznak a=5).
-- Nikoli ne ponavljaj istih številk v obeh delih naloge.
+⚠️⚠️ STROGA PRAVILA SKICE:
+1. PODATKI SO LAHKO SAMO NA ENEM MESTU:
+   - Če so številke v besedilu → skica NE sme vsebovati nobenih številk ali oznak z merami.
+   - Če so številke na skici → besedilo naj vsebuje le vprašanje (npr. "Izračunaj obseg.").
+2. TRIKOTNIK: če so vse tri stranice enake dolžine (a=b=c), je treba v besedilu izrecno navesti "enakostranični trikotnik". Sicer v skici NE uporabi enakih stranic.
+3. Za neenakostranični trikotnik v skici uporabi različne dolžine stranic (a≠b≠c).
 `;
   } else {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
@@ -830,26 +916,41 @@ app.post('/api/generate-task', async (req, res) => {
 RAZRED: ${grade}
 TEMA SKLOPA: "${topicText}"
 
-Naloga MORA biti izključno iz te teme in iz snovi ${grade}. razreda.
-Ne uporabljaj matematičnih orodij, ki niso del teme (npr. Pitagorovega izreka, če tema ni Pitagorov izrek).
+Naloga MORA biti izključno iz te teme in iz snovi ${grade}. razreda po učenem načrtu (iUčbenik in podobno).
+Ne uporabljaj matematičnih orodij, ki niso del teme.
 Naloga naj bo rešljiva SAMO z znanjem te teme.
 
 Vrni izključno JSON.`;
 
-  // Interna navodila za Groq – NISO vidna učencem
+  if (topicRules && topicRules[level] && topicRules[level].forbidden && topicRules[level].forbidden.length) {
+    systemMessage += `\n\n🚫 PREPOVEDANO NA STOPNJI ${level}:\n${topicRules[level].forbidden.join(', ')}\n\nNamig: ${topicRules[level].note || ''}`;
+  } else if (topicRules && topicRules[level] && topicRules[level].note) {
+    systemMessage += `\n\n📌 PRAVILO STOPNJE ${level}: ${topicRules[level].note}`;
+  }
+
   const internalPrompt = (ch.llmPrompt && String(ch.llmPrompt).trim() !== '')
     ? String(ch.llmPrompt).trim()
     : (ch.instructions && String(ch.instructions).trim() !== '' ? String(ch.instructions).trim() : '');
   if (internalPrompt) {
-    systemMessage += `\n\n⚠️⚠️ UKAZ UČITELJA (ima prednost pred vsemi drugimi pravili):\n${internalPrompt}\n\nUpoštevaj ta ukaz do črke natančno. Če ukaz zahteva določen tip naloge (npr. trikotnik), NE uporabi drugega lika (npr. pravokotnika).`;
+    systemMessage += `\n\n⚠️⚠️ UKAZ UČITELJA (ima prednost pred vsemi drugimi pravili):\n${internalPrompt}`;
   }
+
+  systemMessage += `\n\n📊 PROFIL UČENCA:\n${studentProfile}\n
+Na podlagi profila: če je učenec pri nekem tipu pogosto napačen, na isti stopnji utrdi ta tip; če je zelo uspešen, lahko povečaš raznolikost, vendar NE smeš preseči zahtev stopnje.`;
 
   let prompt = `Tema: "${topicText}"
 Razred: ${grade}
-Raven: ${level}/5 – ${levelDesc}
+STOPNJA: ${level}/3 – ${levelDesc}
 Kategorija: ${ch.category === 'domaca' ? 'domača naloga' : 'utrjevanje'}
 
 ${sketchInstruction}
+
+⚠️ KORAKI REŠEVANJA:
+- V polje "steps_required" vrni seznam korakov, ki jih mora učenec narediti za rešitev.
+- Stopnja 1: največ 1 korak.
+- Stopnja 2: največ 2 koraka.
+- Stopnja 3: največ 3 koraki.
+- Če naloga zahteva več korakov, kot jih dovoljuje stopnja, jo poenostavi.
 
 ⚠️ VEČ ODGOVOROV:
 - Če naloga zahteva več izračunov, vrni "answers" kot seznam objektov z "label", "value" in "latex".
@@ -865,6 +966,7 @@ ${recentList || '(še ni bilo nalog)'}
 
 ŠTEVILA, KI SO BILA ŽE UPORABLJENA:
 ${recentNumsList}
+${lastFailedNotice}
 
 PRAVILA:
 - Generiraj natanko eno nalogo.
@@ -877,22 +979,24 @@ Vrni JSON:
   "answers": [{"label":"Odgovor","value":0.75,"latex":"\\\\frac{3}{4}"}],
   "answer": 0.75,
   "answer_latex": "\\\\frac{3}{4}",
+  "steps_required": ["korak 1", "korak 2"],
   "sketch": null
 }`;
 
   if (isRetry && sess.currentTask) {
-    prompt += `\n\nUčenec je prejšnjo nalogo rešil NAPAČNO. Generiraj podobno nalogo iste ravni z drugačnimi števili.`;
+    prompt += `\n\nUčenec je prejšnjo nalogo rešil NAPAČNO. Generiraj podobno nalogo iste stopnje z drugačnimi števili.`;
   }
 
   try {
     let finalData = null;
-    for (let attempt = 1; attempt <= 5; attempt++) {
+    for (let attempt = 1; attempt <= 6; attempt++) {
       const messages = [
         { role: 'system', content: systemMessage },
         { role: 'user', content: prompt }
       ];
       const response = await callAI(messages);
       const data = JSON.parse(response.choices[0].message.content);
+
       if (typeof data.question !== 'string' || data.answer === undefined) {
         prompt += `\n\nOPOZORILO: Neveljavna struktura. Vrni veljaven JSON.`;
         continue;
@@ -920,18 +1024,38 @@ Vrni JSON:
       }
 
       const questionSanitized = normalizeLatex(data.question);
+      const sketch = data.sketch || null;
+      const stepsRequired = Array.isArray(data.steps_required) ? data.steps_required : [];
 
       if (!taskTypeAllowed(questionSanitized, topicText)) {
-        prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip.`;
+        prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip za to temo.`;
         continue;
       }
+
+      // Preveri prepovedane koncepte po stopnji
+      const topicCheck = validateTopicForLevel(questionSanitized, level, topicRules);
+      if (!topicCheck.ok) {
+        prompt += `\n\nOPOZORILO: ${topicCheck.reason}`;
+        continue;
+      }
+
+      // Preveri število korakov
+      const stepsCheck = validateStepsRequired(level, stepsRequired);
+      if (!stepsCheck.ok) {
+        prompt += `\n\nOPOZORILO: ${stepsCheck.reason} Poenostavi nalogo.`;
+        continue;
+      }
+
+      // Preveri skico
+      const sketchCheck = validateSketch(questionSanitized, sketch);
+      if (!sketchCheck.ok) {
+        prompt += `\n\nOPOZORILO: ${sketchCheck.reason}`;
+        continue;
+      }
+
+      // Preveri podobnost
       if (isTooSimilar({ question: questionSanitized }, recent.slice(-10))) {
         prompt += `\n\nOPOZORILO: Prejšnji poskus je bil preveč podoben. Uporabi drugačna števila.`;
-        continue;
-      }
-      // NOVO: preveri podvajanje med skico in besedilom
-      if (!sketchTextConsistent(questionSanitized, data.sketch)) {
-        prompt += `\n\nOPOZORILO: Podatki se podvajajo med skico in besedilom. Če so številke na skici, jih NE ponavljaj v besedilu. Če so številke v besedilu, skica NE sme imeti oznak s številkami (npr. "a = 5 cm"). Skica naj prikaže le obliko brez mer.`;
         continue;
       }
 
@@ -940,37 +1064,16 @@ Vrni JSON:
         answer: answersArr[0].value,
         answerRaw: answersArr[0].latex,
         answers: answersArr,
-        sketch: data.sketch || null
+        sketch,
+        stepsRequired
       };
       break;
     }
 
     if (!finalData) {
-      const messages = [
-        { role: 'system', content: systemMessage },
-        { role: 'user', content: prompt }
-      ];
-      const response = await callAI(messages);
-      const data = JSON.parse(response.choices[0].message.content);
-      let answersArr = Array.isArray(data.answers) && data.answers.length
-        ? data.answers.map(a => ({
-            label: String(a.label || 'Odgovor'),
-            value: typeof a.value === 'number' ? a.value : parseNumberString(a.value),
-            latex: normalizeLatex(a.latex || String(a.value))
-          })).filter(a => !isNaN(a.value))
-        : [{
-            label: 'Odgovor',
-            value: typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer),
-            latex: normalizeLatex(data.answer_latex || String(data.answer))
-          }];
-      if (!answersArr.length) answersArr = [{ label: 'Odgovor', value: 0, latex: '0' }];
-      finalData = {
-        question: normalizeLatex(data.question),
-        answer: answersArr[0].value,
-        answerRaw: answersArr[0].latex,
-        answers: answersArr,
-        sketch: data.sketch || null
-      };
+      sess.lastFailedTask = prompt.slice(0, 200);
+      await saveData();
+      return res.status(500).json({ error: 'Naloge ni bilo mogoče generirati po več poskusih. Poskusi znova.' });
     }
 
     sess.currentTask = {
@@ -979,9 +1082,11 @@ Vrni JSON:
       answerRaw: finalData.answerRaw,
       answers: finalData.answers,
       sketch: finalData.sketch,
+      stepsRequired: finalData.stepsRequired,
       level
     };
     sess.awaitingNext = false;
+    sess.lastFailedTask = null;
     recent.push({ question: finalData.question, answer: finalData.answer });
     if (recent.length > 30) recent.splice(0, recent.length - 30);
     await saveData();
@@ -990,7 +1095,12 @@ Vrni JSON:
       question: finalData.question,
       answers: finalData.answers,
       sketch: finalData.sketch,
-      level, correct: sess.correct, target: 5, grade
+      level,
+      correct: sess.correct,
+      target: 5,
+      grade,
+      progression: sess.progression,
+      requiredInLevel: requiredInLevel(level)
     });
   } catch (err) {
     console.error('Groq napaka:', err.message);
@@ -1042,10 +1152,7 @@ app.post('/api/check-answer', async (req, res) => {
 
   for (let i = 0; i < expected.length; i++) {
     const exp = expected[i];
-    const rawUser = (Array.isArray(userAnswers) && userAnswers[i] !== undefined)
-      ? userAnswers[i]
-      : '';
-
+    const rawUser = (Array.isArray(userAnswers) && userAnswers[i] !== undefined) ? userAnswers[i] : '';
     let ok = false;
     const userNum = parseNumberString(rawUser);
 
@@ -1068,10 +1175,7 @@ Vrni JSON: { "is_correct": true/false }`;
       } catch (e) {
         ok = false;
       }
-    } else {
-      ok = false;
     }
-
     if (!ok) allCorrect = false;
     perAnswer.push({ label: exp.label, ok });
   }
@@ -1103,30 +1207,48 @@ Vrni JSON: { "is_correct": true/false }`;
   if (!st.byType[t]) st.byType[t] = { total: 0, correct: 0 };
   st.byType[t].total++;
   if (allCorrect) st.byType[t].correct++;
-  st.history.push({ ts: Date.now(), question: sess.currentTask.question, ok: allCorrect, attempt: sess.attempts, level: sess.currentTask.level, aiCalls: aiCalls });
+  st.history.push({ ts: Date.now(), question: sess.currentTask.question, ok: allCorrect, attempt: sess.attempts, level: sess.currentTask.level, aiCalls });
   if (st.history.length > 300) st.history = st.history.slice(-300);
   await saveData();
 
   if (allCorrect) {
     sess.correct++;
-    if (sess.correct >= 5) {
-      sess.finished = true; saveData();
+    sess.progression.correctInLevel++;
+    const req = requiredInLevel(sess.progression.level);
+
+    if (sess.progression.correctInLevel >= req) {
+      if (sess.progression.level < 3) {
+        sess.progression.level++;
+        sess.progression.correctInLevel = 0;
+      } else {
+        sess.finished = true;
+      }
+    }
+
+    sess.awaitingNext = false;
+    await saveData();
+
+    if (sess.finished) {
       return res.json({
         correct: true, finished: true,
         correctCount: sess.correct, attempts: sess.attempts,
-        message: 'Bravo! Rešil si vseh 5 nalog. 🎉',
-        aiCalls: aiCalls
+        message: 'Bravo! Rešil si vse naloge na vseh treh stopnjah. 🎉',
+        progression: sess.progression,
+        aiCalls
       });
     }
-    sess.level = Math.min(5, sess.level + 1);
-    sess.awaitingNext = false; saveData();
     return res.json({
       correct: true, finished: false,
-      correctCount: sess.correct, target: 5, nextLevel: sess.level,
+      correctCount: sess.correct, target: 5,
+      nextLevel: sess.progression.level,
+      progression: sess.progression,
+      requiredInLevel: requiredInLevel(sess.progression.level),
       message: 'Odlično! Pravilno.',
-      aiCalls: aiCalls
+      aiCalls
     });
   } else {
+    // Napačno – ne napreduj, shrani za preprečitev ponovitve
+    sess.lastFailedTask = sess.currentTask.question;
     let steps = [];
     try {
       const correctText = expected.map(e => e.label + ': ' + e.latex).join('; ');
@@ -1151,15 +1273,18 @@ Vrni JSON: { "steps": ["korak 1", "korak 2", "Rezultat: ..."] }`;
     } catch (e) {
       steps = expected.map(e => 'Rezultat: ' + e.latex);
     }
-    sess.awaitingNext = true; saveData();
+    sess.awaitingNext = true;
+    await saveData();
     return res.json({
       correct: false, finished: false,
       correctCount: sess.correct, target: 5,
       correctAnswers: expected.map(e => ({ label: e.label, value: e.value, latex: e.latex })),
-      perAnswer: perAnswer,
-      steps: steps,
+      perAnswer,
+      steps,
+      progression: sess.progression,
+      requiredInLevel: requiredInLevel(sess.progression.level),
       message: 'Ni pravilno. Preberi kratko razlago in nato klikni "Poskusi s podobno nalogo".',
-      aiCalls: aiCalls
+      aiCalls
     });
   }
 });
@@ -1168,10 +1293,7 @@ app.post('/api/reset-session', async (req, res) => {
   const { username, chapterId } = req.body || {};
   if (!username || !chapterId) return res.status(400).json({ error: 'Manjka username ali chapterId.' });
   if (!DATA.sessions[username]) DATA.sessions[username] = {};
-  DATA.sessions[username][chapterId] = {
-    level: 1, correct: 0, attempts: 0, currentTask: null,
-    finished: false, awaitingNext: false, history: [], updatedAt: Date.now()
-  };
+  DATA.sessions[username][chapterId] = createEmptySession();
   await saveData();
   res.json({ ok: true });
 });
@@ -1308,16 +1430,13 @@ app.get('/api/student-detail/:username', requireAdmin, (req, res) => {
   if (!user || user.role !== 'student') {
     return res.status(404).json({ error: 'Učenec ne obstaja.' });
   }
-
   const uStats = DATA.stats[username] || {};
   const chapters = [];
-
   Object.keys(uStats).forEach(chId => {
     const s = uStats[chId];
     const ch = DATA.chapters.find(c => c.id === chId);
     if (!ch) return;
     if (!s.total) return;
-
     const pct = Math.round(100 * s.correct / s.total);
     const byType = Object.keys(s.byType || {}).map(t => ({
       type: t, total: s.byType[t].total, correct: s.byType[t].correct,
@@ -1325,7 +1444,6 @@ app.get('/api/student-detail/:username', requireAdmin, (req, res) => {
     }));
     const topErrors = (s.errors || []).slice().sort((a, b) => b.count - a.count).slice(0, 10);
     const recentHistory = (s.history || []).slice(-20).reverse();
-
     chapters.push({
       chapterId: chId, title: ch.title, desc: ch.desc || '',
       grade: ch.grade, category: ch.category, deadline: ch.deadline || null,
@@ -1333,11 +1451,9 @@ app.get('/api/student-detail/:username', requireAdmin, (req, res) => {
       wrong: s.wrong, pct, byType, topErrors, recentHistory
     });
   });
-
   const totalAll = chapters.reduce((a, c) => a + c.total, 0);
   const correctAll = chapters.reduce((a, c) => a + c.correct, 0);
   const overallPct = totalAll ? Math.round(100 * correctAll / totalAll) : 0;
-
   res.json({
     username, firstName: user.firstName, lastName: user.lastName, grade: user.grade,
     overall: { total: totalAll, correct: correctAll, pct: overallPct },
