@@ -29,9 +29,19 @@ if (!process.env.MONGODB_URI) {
    ============================================================ */
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-function normalizeLatex(s) {
+// Odstrani podvojene backslashe in \text{...} ter podobne okraske
+function sanitizeLatex(s) {
   if (!s) return s;
-  return String(s).replace(/\\\\/g, '\\');
+  let t = String(s);
+  // Podvojeni backslashi -> enojni
+  t = t.replace(/\\\\/g, '\\');
+  // Odstrani \text{...}, \mathrm{...}, \mbox{...} (z vsebino vred)
+  t = t.replace(/\\text\{([^{}]*)\}/g, '$1');
+  t = t.replace(/\\mathrm\{([^{}]*)\}/g, '$1');
+  t = t.replace(/\\mbox\{([^{}]*)\}/g, '$1');
+  // Odstrani \text brez oklepajev (redko)
+  t = t.replace(/\\text/g, '');
+  return t;
 }
 
 function parseNumberString(raw) {
@@ -210,7 +220,51 @@ async function saveData() {
 }
 
 /* ============================================================
-   STROGA LESTVICA TEŽAVNOSTI
+   UČNI NAČRT – KLJUČNE TEME PO RAZREDIH (6.–9.)
+   ============================================================ */
+const CURRICULUM = {
+  6: [
+    'naravna števila in število 0, decimalna števila',
+    'seštevanje, odštevanje, množenje in deljenje decimalnih števil',
+    'ulomki (enaki imenovalci, krajšanje, razširjanje)',
+    'obseg in ploščina pravokotnika in kvadrata',
+    'kocka in kvader (površina, prostornina)',
+    'koti (merjenje, vrste kotov)',
+    'preproste enačbe z eno neznanko'
+  ],
+  7: [
+    'cela in racionalna števila',
+    'ulomki (različni imenovalci, množenje, deljenje)',
+    'decimalna števila in odstotki',
+    'obseg in ploščina trikotnika, paralelograma, trapeza',
+    'krožnica in krog (obseg, ploščina)',
+    'potence in koreni (osnove)',
+    'linearna enačba z eno neznanko',
+    'sorazmerje in obratno sorazmerje'
+  ],
+  8: [
+    'Pitagorov izrek',
+    'racionalna števila in izrazi',
+    'linearna enačba in neenačba',
+    'potence z celimi eksponenti',
+    'koreni',
+    'podobnost in skladnost',
+    'krog in krožni izsek',
+    'koordinatni sistem'
+  ],
+  9: [
+    'linearne funkcije',
+    'sistemi linearnih enačb',
+    'kvadratna enačba',
+    'podobnost',
+    'prostornina in površina valja, stožca, krogle',
+    'trigonometrija pravokotnega trikotnika',
+    'statistika in verjetnost'
+  ]
+};
+
+/* ============================================================
+   STROGA PRAVILA GLEDE NA RAZRED IN TEMO
    ============================================================ */
 function strictLevelRules(grade, topic) {
   const t = (topic || '').toLowerCase();
@@ -220,50 +274,60 @@ function strictLevelRules(grade, topic) {
   const isPotence = t.includes('potenc') || t.includes('koren');
   const isOdstotki = t.includes('odstot');
   const isEnacbe = t.includes('enačb') || t.includes('enacb');
-  const isGeometrija = t.includes('geometr') || t.includes('pitagor') || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat') || t.includes('obseg') || t.includes('ploščin') || t.includes('prostornin');
+  const isPitagora = t.includes('pitagor');
+  const isGeometrija = t.includes('geometr') || isPitagora || t.includes('krog') || t.includes('kot') || t.includes('trikot') || t.includes('lik') || t.includes('telo') || t.includes('koordinat') || t.includes('obseg') || t.includes('ploščin') || t.includes('prostornin');
 
+  if (isPitagora) {
+    return {
+      1: 'prepoznaj pravokotni trikotnik in označi kateti ter hipotenuzo.',
+      2: 'Pitagorov izrek z enostavnimi pitagorejskimi trojicami (3,4,5 / 6,8,10).',
+      3: 'izračunaj manjkajočo stranico pravokotnega trikotnika.',
+      4: 'Pitagorov izrek v besedilni nalogi (npr. lestev, diagonala).',
+      5: 'kombinirana naloga: Pitagorov izrek + ploščina/obseg.'
+    };
+  }
   if (isCelaStevila) {
     return {
-      1: 'seštevanje in odštevanje ENOMESTNIH celih števil (npr. 3 + (−4), −2 + 5). Števila od −9 do 9.',
-      2: 'seštevanje in odštevanje DVOMESTNIH celih števil (npr. 23 + (−14), −45 + 12). Števila od −99 do 99.',
-      3: 'množenje ali deljenje enomestnih celih števil (npr. (−3) · 4, −20 : 5). Rezultat naj bo celo število.',
-      4: 'kombinacija dveh operacij z dvomestnimi celimi števili (npr. −12 + 3 · (−4)).',
+      1: 'seštevanje in odštevanje ENOMESTNIH celih števil (npr. 3 + (−4), −2 + 5).',
+      2: 'seštevanje in odštevanje DVOMESTNIH celih števil.',
+      3: 'množenje ali deljenje enomestnih celih števil.',
+      4: 'kombinacija dveh operacij z dvomestnimi celimi števili.',
       5: 'besedilna naloga z več koraki, cela števila do 100.'
     };
   }
   if (isUlomki) {
     return {
-      1: 'ulomki z ENAKIM imenovalcem, seštevanje (npr. 1/4 + 2/4).',
+      1: 'ulomki z ENAKIM imenovalcem, seštevanje.',
       2: 'ulomki z ENAKIM imenovalcem, odštevanje in krajšanje.',
-      3: 'ulomki z RAZLIČNIMI imenovalci (npr. 1/2 + 1/3).',
-      4: 'množenje ali deljenje ulomkov, kombinacija s celimi števili.',
-      5: 'besedilna naloga z ulomki, več korakov.'
+      3: 'ulomki z RAZLIČNIMI imenovalci.',
+      4: 'množenje ali deljenje ulomkov.',
+      5: 'besedilna naloga z ulomki.'
     };
   }
   if (isDecimalna) {
     return {
-      1: 'decimalna števila z ENO decimalko, seštevanje (npr. 0,3 + 0,4).',
+      1: 'decimalna števila z ENO decimalko, seštevanje.',
       2: 'decimalna števila z ENO decimalko, odštevanje.',
-      3: 'decimalna števila z DVEMA decimalkama, seštevanje in odštevanje.',
+      3: 'decimalna števila z DVEMA decimalkama.',
       4: 'množenje ali deljenje decimalnih števil z 10, 100.',
       5: 'besedilna naloga z decimalnimi števili.'
     };
   }
   if (isPotence) {
     return {
-      1: 'kvadrat ENOMESTNEGA števila (npr. 3², 5²).',
+      1: 'kvadrat ENOMESTNEGA števila.',
       2: 'kvadrat DVOMESTNEGA števila ali kub enomestnega.',
-      3: 'kvadratni koren popolnega kvadrata (npr. √25, √81).',
+      3: 'kvadratni koren popolnega kvadrata.',
       4: 'potence z negativnim eksponentom ali kombinacija.',
       5: 'besedilna naloga s potencami ali koreni.'
     };
   }
   if (isOdstotki) {
     return {
-      1: '10 % od okroglega števila (npr. 10 % od 50).',
+      1: '10 % od okroglega števila.',
       2: '1 % in 10 % od števila.',
-      3: 'poljuben odstotek od števila (npr. 25 % od 80).',
-      4: 'odstotek, če poznamo delež (npr. 20 % je 40, koliko je celota).',
+      3: 'poljuben odstotek od števila.',
+      4: 'odstotek, če poznamo delež.',
       5: 'besedilna naloga z odstotki.'
     };
   }
@@ -271,28 +335,27 @@ function strictLevelRules(grade, topic) {
     return {
       1: 'enačba z ENO operacijo (npr. x + 3 = 7).',
       2: 'enačba z DVEMA operacijama (npr. 2x = 8).',
-      3: 'enačba z neznanko na obeh straneh (npr. 2x + 1 = x + 5).',
+      3: 'enačba z neznanko na obeh straneh.',
       4: 'enačba z oklepaji.',
       5: 'besedilna naloga, ki vodi v enačbo.'
     };
   }
   if (isGeometrija) {
     return {
-      1: 'osnovni pojem (npr. prepoznaj lik, izmeri dolžino, obseg kvadrata).',
-      2: 'enostaven izračun (npr. obseg pravokotnika, ploščina kvadrata).',
-      3: 'Pitagorov izrek z enostavnimi števili ali ploščina trikotnika.',
-      4: 'Pitagorov izrek v besedilni nalogi ali ploščina zahtevnejšega lika.',
-      5: 'kombinirana geometrijska naloga (npr. prostornina telesa, več korakov).'
+      1: 'osnovni pojem (prepoznaj lik, izmeri dolžino).',
+      2: 'obseg pravokotnika ali ploščina kvadrata.',
+      3: 'obseg/ploščina trikotnika ali paralelograma BREZ Pitagorovega izreka.',
+      4: 'zahtevnejši lik, a brez Pitagorovega izreka.',
+      5: 'kombinirana geometrijska naloga, brez Pitagorovega izreka.'
     };
   }
 
-  const gradeBase = { 6: 'do 1000', 7: 'do 1000', 8: 'do 10 000', 9: 'do 100 000' }[grade] || 'do 1000';
   return {
-    1: 'enomestna števila, ena operacija (npr. 3 + 4, 9 − 2).',
-    2: 'dvomestna števila brez prehoda čez desetico (npr. 23 + 14).',
-    3: 'dvomestna števila s prehodom čez desetico, dve operaciji.',
+    1: 'enomestna števila, ena operacija.',
+    2: 'dvomestna števila brez prehoda čez desetico.',
+    3: 'dvomestna števila s prehodom čez desetico.',
     4: 'trimestna števila, dve operaciji.',
-    5: 'števila ' + gradeBase + ', besedilna naloga.'
+    5: 'besedilna naloga.'
   };
 }
 
@@ -305,6 +368,16 @@ function levelDescriptionsForGrade(grade) {
   };
   const arr = base[grade] || base[8];
   return { 1: arr[0], 2: arr[1], 3: arr[2], 4: arr[3], 5: arr[4] };
+}
+
+// Preveri, ali naloga vsebuje snow iz višjega razreda, kot je dovoljeno
+function usesHigherGradeTopic(question, grade) {
+  const q = (question || '').toLowerCase();
+  const hasPitagora = q.includes('pitagor') || /hipotenuz/.test(q) || /katet/.test(q);
+  if (hasPitagora && grade < 8) return true;
+  const hasPotence = /\^/.test(q) || /\\sqrt/.test(q) || q.includes('koren') || q.includes('potenc');
+  if (hasPotence && grade < 8) return true;
+  return false;
 }
 
 function taskTypeAllowed(question, topic) {
@@ -366,7 +439,7 @@ async function callAI(prompt, maxAttempts = 6) {
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0.8,
-        max_tokens: 1100
+        max_tokens: 1200
       });
       if (r && r._response && r._response.headers) updateQuotaFromHeaders(r._response.headers);
       return r;
@@ -701,6 +774,8 @@ app.post('/api/generate-task', async (req, res) => {
   const levelDesc = strictRules[level] || strictRules[3];
   const seed = username + '_' + Date.now() + '_' + Math.random();
 
+  const curriculumForGrade = (CURRICULUM[grade] || []).map((t, i) => `${i + 1}. ${t}`).join('\n');
+
   if (!DATA.recentTasks[username]) DATA.recentTasks[username] = {};
   if (!DATA.recentTasks[username][chapterId]) DATA.recentTasks[username][chapterId] = [];
   const recent = DATA.recentTasks[username][chapterId];
@@ -724,45 +799,52 @@ app.post('/api/generate-task', async (req, res) => {
   * {"type":"circle","data":{"r":5,"unit":"cm"}} – krožnica s polmerom r.
   * {"type":"angle","data":{"alpha":45,"beta":60,"unit":"°"}} – kot.
 - Če skica ni smiselna za to nalogo, vrni "sketch": null.
-- Podatki v "data" naj ustrezajo besedilu naloge.
 `;
   } else {
     sketchInstruction = `- Za to temo skica ni potrebna. Vrni "sketch": null.`;
   }
 
   let prompt = `Si matematični tutor za učence ${grade}. razreda OŠ v Sloveniji.
-USTVARJAŠ NALOGO ZA KONKRETNEGA UČENCA (uporabniško ime: ${username}, seme: ${seed}).
+
+⚠️⚠️⚠️ NAJPOMEMBNEJŠE PRAVILO – UČNI NAČRT ⚠️⚠️⚠️
+Naloga MORA biti izključno iz snovi ${grade}. razreda po slovenskem učnem načrtu za matematiko.
+
+Teme, ki SO dovoljene za ${grade}. razred:
+${curriculumForGrade}
+
+Prepovedano je uporabljati snow iz VIŠJIH razredov. Konkretno:
+${grade < 8 ? '- V 6. in 7. razredu NE uporabljaj Pitagorovega izreka, potenc, korenov, linearnih enačb z neznanko na obeh straneh.' : ''}
+${grade < 9 ? '- V 6., 7. in 8. razredu NE uporabljaj kvadratne enačbe, trigonometrije, linearnih funkcij.' : ''}
+- Če je za rešitev naloge potreben Pitagorov izrek, mora biti razred vsaj 8.
+- Če je za rešitev potrebna kvadratna enačba ali trigonometrija, mora biti razred 9.
+
+⚠️ PRIMER ZA 7. RAZRED (obseg in ploščina trikotnika):
+- Dovoljeno: podane so vse tri stranice in višina na eno od stranic.
+- Prepovedano: podani sta le dve stranici, tretjo pa bi bilo treba izračunati s Pitagorovim izrekom (to je snow 8. razreda).
+
 Tema sklopa: "${ch.topic || ch.title}".
 Kategorija: ${ch.category === 'domaca' ? 'domača naloga' : 'utrjevanje'}.
-Raven: ${level}/5.
-
-⚠️ ZELO POMEMBNO – PRIMERNOST ZA RAZRED ${grade}:
-- Naloga MORA biti ustrezna za ${grade}. razred osnovne šole po slovenskem učnem načrtu.
-- Zgleduj se po slovenskih i-učbenikih za matematiko (npr. i-učbenik Matematika 8, poglavja o Pitagorovem izreku, krožnici, kotih) in po tipičnih nalogah, ki jih učenci ${grade}. razreda rešujejo.
-- Naloga naj ima jasno besedilo, ne le goli račun, kadar je to smiselno.
-- Naloga mora ustrezati ravni ${level}/5: ${levelDesc}.
-
-${sketchInstruction}
+Raven: ${level}/5 – ${levelDesc}.
 
 ⚠️ VEČ ODGOVOROV:
 - Če naloga zahteva več različnih izračunov (npr. "izračunaj obseg IN ploščino"), vrni v polju "answers" SEZNAM objektov, vsakega z "label", "value" in "latex".
 - Primer: [{"label":"Obseg","value":16,"latex":"16\\text{ cm}"},{"label":"Ploščina","value":15,"latex":"15\\text{ cm}^2"}]
 - Če naloga zahteva le en odgovor, vrni seznam z enim elementom.
+- V "latex" poljih NE uporabljaj \\text{...}. Enote piši brez \\text, npr. "16 cm" ali "16\\,cm".
 - Polji "answer" in "answer_latex" (za združljivost) naj vsebujeta PRVI odgovor iz seznama.
+
+${sketchInstruction}
 
 ⚠️ STROGO PRAVILO O TIPU NALOGE:
 - Tip naloge mora ustrezati temi "${ch.topic || ch.title}".
 - Če tema vsebuje "cela števila", NE uporabi ulomkov ali decimalnih števil.
 - Če tema vsebuje "ulomke", uporabi ulomke.
 - Če tema vsebuje "decimalna števila", uporabi decimalna števila.
-- Če tema vsebuje "potence" ali "korene", uporabi potence ali korene.
-- Če tema vsebuje "odstotke", uporabi odstotke.
 - Ne mešaj tipov nalog, ki ne sodijo v temo.
 
 ⚠️ RAZNOLIKOST:
 - Naloga mora biti RAZLIČNA od vseh spodaj naštetih prejšnjih nalog.
 - Prepovedano je uporabiti ISTA ŠTEVILA kot v katerikoli prejšnji nalogi.
-- Znotraj istega sklopa naj bodo naloge čim bolj raznolike.
 
 PREJŠNJE NALOGE (izogibaj se jim):
 ${recentList || '(še ni bilo nalog)'}
@@ -771,8 +853,9 @@ ${recentList || '(še ni bilo nalog)'}
 ${recentNumsList}
 
 PRAVILA ZA NALOGO:
-- Generiraj NATANKO ENO nalogo, edinstveno za tega učenca.
-- Uporabi LaTeX za matematične izraze: ulomki kot \\frac{a}{b}, potence kot x^{2}, koreni kot \\sqrt{x}, decimalna vejica kot 0{,}5.
+- Generiraj NATANKO ENO nalogo.
+- Uporabi LaTeX za matematične izraze: ulomki kot \\frac{a}{b}, potence kot x^{2}, koreni kot \\sqrt{x}.
+- NE uporabljaj \\text{...} v LaTeX poljih. Namesto "\\text{ cm}" piši " cm".
 - V poljih "answer_latex" in "latex" uporabi ENAK zapis kot v besedilu naloge (en backslash pred \\frac).
 - Naloga naj bo v slovenščini, primerna ${grade}. razredu.
 - Vsi odgovori v "answers" naj bodo enolično določljivi in zapisani kot ŠTEVILA.
@@ -787,12 +870,12 @@ Vrni izključno JSON:
 }`;
 
   if (isRetry && sess.currentTask) {
-    prompt += `\n\nUčenec je prejšnjo nalogo rešil NAPAČNO. Generiraj PODOBNO nalogo ISTE ravni (${level}/5), a z DRUGAČNIMI ŠTEVILI kot v prejšnji nalogi (prejšnja: "${sess.currentTask.question}").`;
+    prompt += `\n\nUčenec je prejšnjo nalogo rešil NAPAČNO. Generiraj PODOBNO nalogo ISTE ravni (${level}/5), a z DRUGAČNIMI ŠTEVILI kot v prejšnji nalogi.`;
   }
 
   try {
     let finalData = null;
-    for (let attempt = 1; attempt <= 4; attempt++) {
+    for (let attempt = 1; attempt <= 5; attempt++) {
       const response = await callAI(prompt);
       const data = JSON.parse(response.choices[0].message.content);
       if (typeof data.question !== 'string' || data.answer === undefined) {
@@ -805,7 +888,7 @@ Vrni izključno JSON:
         answersArr = data.answers.map(a => ({
           label: String(a.label || 'Odgovor'),
           value: typeof a.value === 'number' ? a.value : parseNumberString(a.value),
-          latex: normalizeLatex(a.latex || String(a.value))
+          latex: sanitizeLatex(a.latex || String(a.value))
         })).filter(a => !isNaN(a.value));
       }
       if (!answersArr.length) {
@@ -817,17 +900,24 @@ Vrni izključno JSON:
         answersArr = [{
           label: 'Odgovor',
           value: ansNum,
-          latex: normalizeLatex(data.answer_latex || String(data.answer))
+          latex: sanitizeLatex(data.answer_latex || String(data.answer))
         }];
       }
 
+      const questionSanitized = sanitizeLatex(data.question);
       const candidate = {
-        question: normalizeLatex(data.question),
+        question: questionSanitized,
         answer: answersArr[0].value,
         answerRaw: answersArr[0].latex,
         answers: answersArr,
         sketch: data.sketch || null
       };
+
+      // Preveri snow iz višjega razreda
+      if (usesHigherGradeTopic(questionSanitized, grade)) {
+        prompt += `\n\nOPOZORILO: Naloga vsebuje snow iz VIŠJEGA razreda (npr. Pitagorov izrek pri ${grade}. razredu). Generiraj nalogo, ki ustreza SAMO snovi ${grade}. razreda.`;
+        continue;
+      }
 
       if (!taskTypeAllowed(candidate.question, ch.topic || ch.title)) {
         prompt += `\n\nOPOZORILO: Naloga vsebuje napačen tip. Uporabi SAMO tip, ki ustreza temi "${ch.topic || ch.title}".`;
@@ -848,16 +938,16 @@ Vrni izključno JSON:
         ? data.answers.map(a => ({
             label: String(a.label || 'Odgovor'),
             value: typeof a.value === 'number' ? a.value : parseNumberString(a.value),
-            latex: normalizeLatex(a.latex || String(a.value))
+            latex: sanitizeLatex(a.latex || String(a.value))
           })).filter(a => !isNaN(a.value))
         : [{
             label: 'Odgovor',
             value: typeof data.answer === 'number' ? data.answer : parseNumberString(data.answer),
-            latex: normalizeLatex(data.answer_latex || String(data.answer))
+            latex: sanitizeLatex(data.answer_latex || String(data.answer))
           }];
       if (!answersArr.length) answersArr = [{ label: 'Odgovor', value: 0, latex: '0' }];
       finalData = {
-        question: normalizeLatex(data.question),
+        question: sanitizeLatex(data.question),
         answer: answersArr[0].value,
         answerRaw: answersArr[0].latex,
         answers: answersArr,
@@ -1022,15 +1112,14 @@ RAZLAGA MORA BITI:
 - Napisana v ZELO PREPROSTEM SLOVENSKEM JEZIKU, primernem ${ch.grade}. razredu OŠ.
 - Kratka: največ 3 alineje, vsaka največ 1–2 kratka stavka.
 - Brez težkih besed, brez teorije, brez uvodov.
-- Uporabi POSTOPEK, ki se uporablja v slovenskih šolah pri tej temi.
-- Osredotoči se na tisto, kar bo učencu pomagalo pri NASLEDNJI podobni nalogi.
 - Uporabi LaTeX za matematične izraze (en backslash pred \\frac).
+- NE uporabljaj \\text{...}. Enote piši brez \\text.
 - Zadnja alineja naj bo pravilen rezultat v obliki: "Rezultat: <latex>".
 
 Vrni JSON: { "steps": ["korak 1", "korak 2", "Rezultat: ..."] }`;
       const response = await callAI(prompt);
       const data = JSON.parse(response.choices[0].message.content);
-      steps = Array.isArray(data.steps) ? data.steps.map(normalizeLatex) : [];
+      steps = Array.isArray(data.steps) ? data.steps.map(sanitizeLatex) : [];
     } catch (e) {
       steps = expected.map(e => 'Rezultat: ' + e.latex);
     }
